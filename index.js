@@ -198,6 +198,92 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    // Submit Information Endpoint
+    app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
+      try {
+        const {
+          name,
+          parentName,
+          instituteClass,
+          instituteRollNumber,
+          institute,
+          phone,
+          gender,
+          presentAddress,
+          bloodGroup,
+        } = req.body;
+
+        // Check if all required fields are provided
+        if (!name || !institute || !phone || !gender || !location) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Get the user ID from the token
+        const userId = req.userId;
+
+        // Insert the submitted information into the database
+        const result = await database.collection("scholarship").insertOne({
+          userId: ObjectId(userId),
+          name,
+          parentName,
+          instituteClass,
+          instituteRollNumber,
+          institute,
+          phone,
+          gender,
+          presentAddress,
+          bloodGroup,
+          submittedAt: new Date(),
+        });
+
+        // Check if the insertion was successful
+        if (result.insertedCount !== 1) {
+          throw new Error("Failed to submit information");
+        }
+
+        res.status(201).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Endpoint to retrieve all submitted information
+    app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Verify token and get user ID
+        const userId = req.userId;
+
+        // Fetch all submitted information for the user
+        const submittedInfo = await database
+          .collection("scholarship")
+          .find({ userId: ObjectId(userId) })
+          .toArray();
+
+        res.status(200).json(submittedInfo);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Middleware function to verify JWT token
+    function verifyAuthToken(req, res, next) {
+      const token = req.headers.authorization?.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const userId = verifyToken(token);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Pass the user ID to the next middleware or route handler
+      req.userId = userId;
+      next();
+    }
   } finally {
     // await client.close();
   }
