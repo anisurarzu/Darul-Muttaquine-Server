@@ -279,6 +279,79 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    // Update Information Endpoint
+    app.put("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const scholarshipId = req.params.id;
+        const {
+          name,
+          parentName,
+          instituteClass,
+          instituteRollNumber,
+          institute,
+          phone,
+          gender,
+          presentAddress,
+          bloodGroup,
+        } = req.body;
+
+        // Check if all required fields are provided
+        if (!name || !institute || !phone || !gender || !location) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Update the information in the database
+        const result = await database.collection("scholarship").updateOne(
+          { _id: ObjectId(scholarshipId) },
+          {
+            $set: {
+              name,
+              parentName,
+              instituteClass,
+              instituteRollNumber,
+              institute,
+              phone,
+              gender,
+              presentAddress,
+              bloodGroup,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        // Check if the update was successful
+        if (result.modifiedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information updated successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Delete Information Endpoint
+    app.delete("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const scholarshipId = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("scholarship").deleteOne({
+          _id: ObjectId(scholarshipId),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
