@@ -218,8 +218,8 @@ async function run() {
           name,
           parentName,
           instituteClass,
-          instituteRollNumber,
           institute,
+          instituteRollNumber,
           phone,
           gender,
           presentAddress,
@@ -227,9 +227,19 @@ async function run() {
         } = req.body;
 
         // Check if all required fields are provided
-        if (!name || !institute || !phone || !gender || !location) {
+        if (
+          !name ||
+          !institute ||
+          !phone ||
+          !gender ||
+          !presentAddress ||
+          !bloodGroup
+        ) {
           return res.status(400).json({ message: "All fields are required" });
         }
+
+        // Generate a unique scholarship roll number with "dmf" prefix
+        const scholarshipRollNumber = generateUniqueScholarshipRollNumber();
 
         // Get the user ID from the token
         const userId = req.userId;
@@ -241,6 +251,7 @@ async function run() {
           parentName,
           instituteClass,
           instituteRollNumber,
+          scholarshipRollNumber: scholarshipRollNumber, // Assign scholarship roll number directly
           institute,
           phone,
           gender,
@@ -260,6 +271,17 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    // Function to generate unique scholarship roll number with "dmf" prefix
+    function generateUniqueScholarshipRollNumber() {
+      // Generate a random number between 100000 and 999999
+      const randomNumber = Math.floor(100000 + Math.random() * 900000);
+
+      // Concatenate "dmf" prefix with the random number
+      const scholarshipRollNumber = "dmf" + randomNumber;
+
+      return scholarshipRollNumber;
+    }
 
     // Endpoint to retrieve all submitted information
     app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
