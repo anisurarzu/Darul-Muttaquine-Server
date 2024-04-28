@@ -179,12 +179,23 @@ async function run() {
     // Endpoint to fetch user information
     app.get("/userinfo", async (req, res) => {
       try {
+        // Extract token from Authorization header
         const token = req.headers.authorization?.split(" ")[1];
-        const userId = verifyToken(token);
-        if (!userId) {
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!token) {
+          return res
+            .status(401)
+            .json({ message: "Unauthorized: Token missing" });
         }
 
+        // Verify and decode the token
+        const userId = verifyToken(token);
+        if (!userId) {
+          return res
+            .status(401)
+            .json({ message: "Unauthorized: Invalid token" });
+        }
+
+        // Fetch user information from the database
         const user = await database
           .collection("users")
           .findOne({ _id: ObjectId(userId) });
@@ -192,6 +203,7 @@ async function run() {
           return res.status(404).json({ message: "User not found" });
         }
 
+        // Send user information in the response
         res.status(200).json(user);
       } catch (error) {
         console.error(error);
