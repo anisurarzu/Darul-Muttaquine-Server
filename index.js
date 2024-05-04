@@ -7,6 +7,9 @@ const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
 const swaggerJsdoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 dotenv.config();
 
@@ -59,6 +62,129 @@ async function run() {
     // Serve Swagger UI
     app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+    // file upload option
+
+    // Define the upload directory
+    const uploadDirectory = path.join(__dirname, "uploads");
+
+    // Create the uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadDirectory)) {
+      fs.mkdirSync(uploadDirectory);
+    }
+
+    // Multer configuration
+    const multer = require("multer");
+    const storage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        cb(null, uploadDirectory);
+      },
+      filename: function (req, file, cb) {
+        cb(null, Date.now() + "-" + file.originalname);
+      },
+    });
+    const upload = multer({ storage: storage });
+
+    // File upload endpoint
+    // File upload endpoint
+    app.post(
+      "/upload",
+      verifyAuthToken,
+      upload.single("file"),
+      async (req, res) => {
+        try {
+          if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+          }
+
+          // Read the uploaded file
+          const fileData = fs.readFileSync(req.file.path);
+
+          // Encode the file data to base64
+          const encodedFile = fileData.toString("base64");
+
+          // Create a document to store in the database
+          const imageDocument = {
+            filename: req.file.filename,
+            data: encodedFile,
+            contentType: req.file.mimetype,
+            historyName: req.body.historyName, // Additional information
+            historyDate: req.body.historyDate, // Additional information
+            historyDetails: req.body.historyDetails, // Additional information
+          };
+
+          // Store the document in the database
+          const result = await database
+            .collection("historyInfo")
+            .insertOne(imageDocument);
+
+          // Check if the insertion was successful
+          if (!result) {
+            console.error("Failed to insert image into the database");
+            return res.status(500).json({ message: "Failed to store image" });
+          }
+
+          // Delete the uploaded file from the filesystem
+          fs.unlinkSync(req.file.path);
+
+          res.status(200).json({
+            message: "File uploaded successfully",
+            filename: req.file.filename,
+          });
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          res.status(500).json({ message: "Server Error" });
+        }
+      }
+    );
+
+    // Get all uploaded files
+    app.get("/upload", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all documents from the historyInfo collection
+        const files = await database
+          .collection("historyInfo")
+          .find({})
+          .toArray();
+
+        res.status(200).json(files);
+      } catch (error) {
+        console.error("Error fetching files:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    // Delete uploaded file by ID
+    app.delete("/upload/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const fileId = req.params.id;
+
+        // Delete the uploaded file from the database by ID
+        const result = await database
+          .collection("historyInfo")
+          .deleteOne({ _id: ObjectId(fileId) });
+
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "File not found" });
+        }
+
+        res.status(200).json({ message: "File deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting file:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/historyInfo", async (req, res) => {
+      try {
+        const historyInfo = await database
+          .collection("historyInfo")
+          .find()
+          .toArray();
+        res.status(200).json(historyInfo);
+      } catch (error) {
+        console.error("Error retrieving history information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
     // Registration Endpoint
     app.post("/register", async (req, res) => {
       try {
@@ -212,6 +338,7 @@ async function run() {
     });
 
     // Submit Information Endpoint
+    // Submit Information Endpoint
     app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
       try {
         const {
@@ -219,11 +346,12 @@ async function run() {
           parentName,
           instituteClass,
           institute,
-          instituteRollNumber,
           phone,
           gender,
+          instituteRollNumber,
           presentAddress,
           bloodGroup,
+          image,
         } = req.body;
 
         // Check if all required fields are provided
@@ -257,17 +385,23 @@ async function run() {
           gender,
           presentAddress,
           bloodGroup,
+          image,
           submittedAt: new Date(),
         });
 
+        console.log("Insertion result:", result);
+
         // Check if the insertion was successful
-        if (result.insertedCount !== 1) {
-          throw new Error("Failed to submit information");
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
         }
 
         res.status(201).json({ message: "Information submitted successfully" });
       } catch (error) {
-        console.error(error);
+        console.error("Error submitting information:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
@@ -278,7 +412,7 @@ async function run() {
       const randomNumber = Math.floor(100000 + Math.random() * 900000);
 
       // Concatenate "dmf" prefix with the random number
-      const scholarshipRollNumber = "dmf" + randomNumber;
+      const scholarshipRollNumber = "DMF" + randomNumber;
 
       return scholarshipRollNumber;
     }
