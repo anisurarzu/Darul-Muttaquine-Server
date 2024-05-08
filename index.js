@@ -10,6 +10,7 @@ const swaggerUi = require("swagger-ui-express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { Server: WebSocketServer } = require("ws");
 
 dotenv.config();
 
@@ -38,6 +39,16 @@ function verifyToken(token) {
     return null;
   }
 }
+
+// Define WebSocket server
+const wss = new WebSocketServer({ port: 8080 });
+// WebSocket connection handling
+wss.on("connection", (ws) => {
+  console.log("WebSocket client connected");
+
+  // Example: Send a welcome message to the client
+  ws.send("Welcome to the WebSocket server!");
+});
 
 async function run() {
   try {
@@ -337,6 +348,19 @@ async function run() {
       }
     });
 
+    // Endpoint to get all users
+    app.get("/users", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("users").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Submit Information Endpoint
     // Submit Information Endpoint
     app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
@@ -531,6 +555,12 @@ async function run() {
 }
 
 run().catch(console.dir);
+
+// WebSocket broadcast for all APIs
+app.use((req, res, next) => {
+  req.ws = wss; // Add WebSocket server instance to the request object
+  next();
+});
 
 app.get("/", (req, res) => {
   res.send("dmf server two is running");

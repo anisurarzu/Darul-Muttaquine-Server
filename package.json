@@ -23,6 +23,7 @@
     "stripe": "^8.197.0",
     "swagger-autogen": "^2.23.7",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "swagger-ui-express": "^5.0.0",
+    "ws": "^8.17.0"
   }
 }
