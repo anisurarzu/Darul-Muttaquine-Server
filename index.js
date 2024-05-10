@@ -10,7 +10,7 @@ const swaggerUi = require("swagger-ui-express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { Server: WebSocketServer } = require("ws");
+// const { Server: WebSocketServer } = require("ws");
 
 dotenv.config();
 
@@ -556,11 +556,11 @@ async function run() {
 
 run().catch(console.dir);
 
-// WebSocket broadcast for all APIs
-app.use((req, res, next) => {
-  req.ws = wss; // Add WebSocket server instance to the request object
-  next();
-});
+// // WebSocket broadcast for all APIs
+// app.use((req, res, next) => {
+//   req.ws = wss; // Add WebSocket server instance to the request object
+//   next();
+// });
 
 app.get("/", (req, res) => {
   res.send("dmf server two is running");
