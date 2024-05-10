@@ -349,7 +349,7 @@ async function run() {
     });
 
     // Endpoint to get all users
-    app.get("/users", verifyAuthToken, async (req, res) => {
+    app.get("/users", async (req, res) => {
       try {
         // Fetch all users from the database
         const users = await database.collection("users").find().toArray();
@@ -459,6 +459,7 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
     // Update Information Endpoint
     app.put("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
       try {
