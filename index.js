@@ -40,15 +40,15 @@ function verifyToken(token) {
   }
 }
 
-// Define WebSocket server
-const wss = new WebSocketServer({ port: 8080 });
-// WebSocket connection handling
-wss.on("connection", (ws) => {
-  console.log("WebSocket client connected");
+// // Define WebSocket server
+// const wss = new WebSocketServer({ port: 8080 });
+// // WebSocket connection handling
+// wss.on("connection", (ws) => {
+//   console.log("WebSocket client connected");
 
-  // Example: Send a welcome message to the client
-  ws.send("Welcome to the WebSocket server!");
-});
+//   // Example: Send a welcome message to the client
+//   ws.send("Welcome to the WebSocket server!");
+// });
 
 async function run() {
   try {
