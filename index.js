@@ -361,6 +361,55 @@ async function run() {
       }
     });
 
+    /* Amount Deposit Information */
+    app.post("/deposit-info", verifyAuthToken, async (req, res) => {
+      try {
+        const { amount, userID, phone, tnxID, paymentMethod } = req.body;
+
+        // Check if all required fields are provided
+        if (!amount || !userID || !phone || !tnxID) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Insert the submitted information into the database
+        const result = await database.collection("deposit").insertOne({
+          userID,
+          amount,
+          phone,
+          tnxID,
+          paymentMethod,
+          depositDate: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(201).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/deposit-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("deposit").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Submit Information Endpoint
     // Submit Information Endpoint
     app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
@@ -456,6 +505,37 @@ async function run() {
         res.status(200).json(submittedInfo);
       } catch (error) {
         console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    const { ObjectId } = require("mongodb");
+
+    // Assuming `database` is your MongoDB database connection
+
+    app.get("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const scholarshipId = req.params.id;
+
+        // Check if the provided ID is a valid ObjectId
+        if (!ObjectId.isValid(scholarshipId)) {
+          return res.status(400).json({ message: "Invalid scholarship ID" });
+        }
+
+        // Query the database for the scholarship information
+        const scholarship = await database.collection("scholarship").findOne({
+          _id: ObjectId(scholarshipId),
+          userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
+        });
+
+        // Check if the scholarship exists
+        if (!scholarship) {
+          return res.status(404).json({ message: "Scholarship not found" });
+        }
+
+        res.status(200).json({ scholarship });
+      } catch (error) {
+        console.error("Error fetching scholarship information:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
