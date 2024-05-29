@@ -409,7 +409,109 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    // Delete Information Endpoint
+    app.delete("/deposit-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
 
+        // Delete the information from the database
+        const result = await database.collection("deposit").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* 
+    Result Information
+    */
+    app.post("/add-result", verifyAuthToken, async (req, res) => {
+      try {
+        const { scholarshipRollNumber, resultDetails } = req.body;
+
+        console.log("--", scholarshipRollNumber);
+
+        /*  // Check if all required fields are provided
+        if (!scholarshipRollNumber || !Array.isArray(resultDetails)) {
+          return res.status(400).json({
+            message: "scholarshipRollNumber and resultDetails are required",
+          });
+        } */
+
+        // Get the user ID from the token
+        const userId = req.userId;
+
+        // Find the scholarship document and update the resultDetails array
+        const result = await database.collection("scholarship").updateOne(
+          { scholarshipRollNumber: scholarshipRollNumber },
+          {
+            $set: { userId: ObjectId(userId) },
+            $push: { resultDetails: { $each: [resultDetails] } },
+          }
+        );
+
+        console.log("Update result:", result);
+
+        // Check if the update was successful
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Scholarship not found" });
+        }
+
+        if (result.modifiedCount === 0) {
+          console.error("Failed to update result details in the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to add result details" });
+        }
+
+        res.status(200).json({ message: "Result details added successfully" });
+      } catch (error) {
+        console.error("Error adding result details:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/deposit-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("deposit").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    // Delete Information Endpoint
+    app.delete("/deposit-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("deposit").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
     // Submit Information Endpoint
     // Submit Information Endpoint
     app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
