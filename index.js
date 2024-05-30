@@ -235,6 +235,41 @@ async function run() {
       }
     });
 
+    /* change password api */
+    app.post("/change-password", verifyAuthToken, async (req, res) => {
+      try {
+        const { oldPassword, newPassword, email } = req.body;
+
+        // Check if user exists
+        const user = await database.collection("users").findOne({ email });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Validate old password
+        const isPasswordValid = await bcrypt.compare(
+          oldPassword,
+          user.password
+        );
+        if (!isPasswordValid) {
+          return res.status(400).json({ message: "Old password is incorrect" });
+        }
+
+        // Hash the new password
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10); // Use 10 rounds of salt
+
+        // Update user's password in the database
+        await database
+          .collection("users")
+          .updateOne({ email }, { $set: { password: hashedNewPassword } });
+
+        res.status(200).json({ message: "Password changed successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Login Endpoint
     app.post("/login", async (req, res) => {
       try {
@@ -256,6 +291,94 @@ async function run() {
         const token = generateToken(user._id);
 
         res.status(200).json({ token });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* user profile update */
+    const generateUniqueId = async () => {
+      let isUnique = false;
+      let uniqueId;
+      while (!isUnique) {
+        const randomNum = Math.floor(1000 + Math.random() * 9000); // Generates a random 4-digit number
+        uniqueId = `DMF-${randomNum}`;
+        const existingUser = await database
+          .collection("users")
+          .findOne({ uniqueId });
+        if (!existingUser) {
+          isUnique = true;
+        }
+      }
+      return uniqueId;
+    };
+    // Update the /update-user endpoint in your server code
+
+    app.post("/update-user", verifyAuthToken, async (req, res) => {
+      try {
+        const {
+          firstName,
+          lastName,
+          username,
+          image,
+          phone,
+          bloodGroup,
+          gender,
+          email,
+          currentAddress,
+          permanentAddress,
+          birthDate,
+          profession,
+        } = req.body;
+        // Extract email from verified token
+
+        console.log("email", email);
+
+        // Check if user exists
+        const user = await database
+          .collection("users")
+          .findOne({ email: email });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Generate unique ID if it doesn't exist
+        if (!user.uniqueId) {
+          const uniqueId = await generateUniqueId();
+          user.uniqueId = uniqueId;
+          await database
+            .collection("users")
+            .updateOne({ email: email }, { $set: { uniqueId } });
+        }
+
+        // Update existing user details
+        const updatedData = {
+          ...(firstName && { firstName }),
+          ...(lastName && { lastName }),
+          ...(username && { username }),
+          ...(image && { image }),
+          ...(phone && { phone }),
+          ...(bloodGroup && { bloodGroup }),
+          ...(gender && { gender }),
+          ...(email && { email }),
+          ...(currentAddress && { currentAddress }),
+          ...(permanentAddress && { permanentAddress }),
+          ...(birthDate && { birthDate }),
+          ...(profession && { profession }),
+        };
+
+        await database
+          .collection("users")
+          .updateOne({ email: email }, { $set: updatedData });
+
+        const updatedUser = await database
+          .collection("users")
+          .findOne({ email: email });
+
+        res
+          .status(200)
+          .json({ message: "User updated successfully", user: updatedUser });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
