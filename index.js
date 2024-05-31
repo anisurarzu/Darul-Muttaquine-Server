@@ -223,6 +223,7 @@ async function run() {
           email,
           password: hashedPassword,
           verificationToken,
+          createdAt: new Date(),
         });
 
         // Send verification email
@@ -602,6 +603,35 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    /* get result */
+    app.get(
+      "/search-result/:scholarshipRollNumber",
+      verifyAuthToken,
+      async (req, res) => {
+        try {
+          const { scholarshipRollNumber } = req.params;
+
+          // Get the user ID from the token (if needed for additional checks)
+          const userId = req.userId;
+
+          // Find the scholarship document by scholarshipRollNumber
+          const scholarship = await database
+            .collection("scholarship")
+            .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+
+          // Check if the scholarship document exists
+          if (!scholarship) {
+            return res.status(404).json({ message: "Scholarship not found" });
+          }
+
+          res.status(200).json(scholarship);
+        } catch (error) {
+          console.error("Error searching for result:", error);
+          res.status(500).json({ message: "Server Error" });
+        }
+      }
+    );
 
     app.get("/deposit-info", verifyAuthToken, async (req, res) => {
       try {
