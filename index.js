@@ -148,6 +148,37 @@ async function run() {
       }
     );
 
+    /* insert history */
+    app.post("/history-info", verifyAuthToken, async (req, res) => {
+      try {
+        const { name, subtitle, description, image } = req.body;
+
+        // Insert the submitted information into the database
+        const result = await database.collection("historyInfo").insertOne({
+          name,
+          subtitle,
+          description,
+          image,
+          createdAt: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(200).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Get all uploaded files
     app.get("/upload", verifyAuthToken, async (req, res) => {
       try {
@@ -193,6 +224,26 @@ async function run() {
         res.status(200).json(historyInfo);
       } catch (error) {
         console.error("Error retrieving history information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.delete("/history-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("history").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
     });
@@ -506,7 +557,7 @@ async function run() {
     });
 
     // Endpoint to get all users
-    app.get("/users", verifyAuthToken, async (req, res) => {
+    app.get("/users", async (req, res) => {
       try {
         // Fetch all users from the database
         const users = await database.collection("users").find().toArray();
