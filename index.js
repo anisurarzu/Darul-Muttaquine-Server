@@ -386,6 +386,39 @@ async function run() {
       }
     });
 
+    // update user role by admin
+
+    app.post("/update-user-role", verifyAuthToken, async (req, res) => {
+      try {
+        const { userRole, email } = req.body;
+
+        // Check if user exists
+        const user = await database
+          .collection("users")
+          .findOne({ email: email });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update user role
+        await database
+          .collection("users")
+          .updateOne({ email: email }, { $set: { userRole } });
+
+        const updatedUser = await database
+          .collection("users")
+          .findOne({ email: email });
+
+        res.status(200).json({
+          message: "User role updated successfully",
+          user: updatedUser,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Function to generate JWT token
     function generateToken(userId) {
       // Replace with your secret key
@@ -488,7 +521,8 @@ async function run() {
     /* Amount Deposit Information */
     app.post("/deposit-info", verifyAuthToken, async (req, res) => {
       try {
-        const { amount, userID, phone, tnxID, paymentMethod } = req.body;
+        const { amount, userID, phone, tnxID, paymentMethod, project } =
+          req.body;
 
         // Check if all required fields are provided
         if (!amount || !userID || !phone || !tnxID) {
@@ -502,6 +536,7 @@ async function run() {
           phone,
           tnxID,
           paymentMethod,
+          project,
           depositDate: new Date(),
         });
 
@@ -555,6 +590,120 @@ async function run() {
       }
     });
 
+    /* project information */
+    app.post("/add-project-info", verifyAuthToken, async (req, res) => {
+      try {
+        const {
+          projectName,
+          startDate,
+          endDate,
+          projectLeader,
+          projectFund,
+          image,
+          details,
+          approvalStatus,
+          yesVote,
+          noVote,
+        } = req.body;
+
+        // Insert the submitted information into the database
+        const result = await database.collection("project").insertOne({
+          projectName,
+          startDate,
+          endDate,
+          projectLeader,
+          projectFund,
+          image,
+          details,
+          approvalStatus,
+          yesVote,
+          noVote,
+          createdAt: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(200).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.get("/project-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("project").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* update approval status on project  */
+    app.post("/update-project-status", verifyAuthToken, async (req, res) => {
+      try {
+        const { approvalStatus, projectID } = req.body;
+
+        // Check if user exists
+        const user = await database
+          .collection("project")
+          .findOne({ _id: ObjectId(projectID) });
+        if (!user) {
+          return res.status(404).json({ message: "Project not found" });
+        }
+
+        // Update user role
+        await database
+          .collection("project")
+          .updateOne(
+            { _id: ObjectId(projectID) },
+            { $set: { approvalStatus } }
+          );
+
+        const updatedUser = await database
+          .collection("project")
+          .findOne({ _id: ObjectId(projectID) });
+
+        res.status(200).json({
+          message: "Project Status updated successfully",
+          user: updatedUser,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    /* delete project */
+    app.delete("/project-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("project").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
     /* 
     Result Information
     */
