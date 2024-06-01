@@ -568,6 +568,25 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    /*  deposit get which is created */
+    app.get("/deposit-info-user", verifyAuthToken, async (req, res) => {
+      try {
+        // Verify token and get user ID
+        const userId = req.userId;
+
+        // Fetch all submitted information for the user
+        const submittedInfo = await database
+          .collection("deposit")
+          .find({ userId: ObjectId(userId) })
+          .toArray();
+
+        res.status(200).json(submittedInfo);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
     // Delete Information Endpoint
     app.delete("/deposit-info/:id", verifyAuthToken, async (req, res) => {
       try {
@@ -782,38 +801,6 @@ async function run() {
       }
     );
 
-    app.get("/deposit-info", verifyAuthToken, async (req, res) => {
-      try {
-        // Fetch all users from the database
-        const users = await database.collection("deposit").find().toArray();
-        // Send the list of users in the response
-        res.status(200).json(users);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server Error" });
-      }
-    });
-    // Delete Information Endpoint
-    app.delete("/deposit-info/:id", verifyAuthToken, async (req, res) => {
-      try {
-        const id = req.params.id;
-
-        // Delete the information from the database
-        const result = await database.collection("deposit").deleteOne({
-          _id: ObjectId(id),
-        });
-
-        // Check if the deletion was successful
-        if (result.deletedCount !== 1) {
-          return res.status(404).json({ message: "Information not found" });
-        }
-
-        res.status(200).json({ message: "Information deleted successfully" });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server Error" });
-      }
-    });
     // Submit Information Endpoint
     // Submit Information Endpoint
     app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
