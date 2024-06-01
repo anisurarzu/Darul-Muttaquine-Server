@@ -506,7 +506,7 @@ async function run() {
     });
 
     // Endpoint to get all users
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyAuthToken, async (req, res) => {
       try {
         // Fetch all users from the database
         const users = await database.collection("users").find().toArray();
@@ -773,33 +773,29 @@ async function run() {
     });
 
     /* get result */
-    app.get(
-      "/search-result/:scholarshipRollNumber",
-      verifyAuthToken,
-      async (req, res) => {
-        try {
-          const { scholarshipRollNumber } = req.params;
+    app.get("/search-result/:scholarshipRollNumber", async (req, res) => {
+      try {
+        const { scholarshipRollNumber } = req.params;
 
-          // Get the user ID from the token (if needed for additional checks)
-          const userId = req.userId;
+        // Get the user ID from the token (if needed for additional checks)
+        const userId = req.userId;
 
-          // Find the scholarship document by scholarshipRollNumber
-          const scholarship = await database
-            .collection("scholarship")
-            .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+        // Find the scholarship document by scholarshipRollNumber
+        const scholarship = await database
+          .collection("scholarship")
+          .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
-          // Check if the scholarship document exists
-          if (!scholarship) {
-            return res.status(404).json({ message: "Scholarship not found" });
-          }
-
-          res.status(200).json(scholarship);
-        } catch (error) {
-          console.error("Error searching for result:", error);
-          res.status(500).json({ message: "Server Error" });
+        // Check if the scholarship document exists
+        if (!scholarship) {
+          return res.status(404).json({ message: "Scholarship not found" });
         }
+
+        res.status(200).json(scholarship);
+      } catch (error) {
+        console.error("Error searching for result:", error);
+        res.status(500).json({ message: "Server Error" });
       }
-    );
+    });
 
     // Submit Information Endpoint
     // Submit Information Endpoint
