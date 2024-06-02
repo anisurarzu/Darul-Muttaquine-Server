@@ -227,26 +227,31 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
     app.delete("/history-info/:id", verifyAuthToken, async (req, res) => {
       try {
-        const id = req.params.id;
+        const { id } = req.params;
 
-        // Delete the information from the database
-        const result = await database.collection("history").deleteOne({
-          _id: ObjectId(id),
-        });
+        // Attempt to delete the document with the specified id from the database
+        const result = await database
+          .collection("historyInfo")
+          .deleteOne({ _id: new ObjectId(id) });
+
+        console.log("Deletion result:", result);
 
         // Check if the deletion was successful
-        if (result.deletedCount !== 1) {
+        if (result.deletedCount === 0) {
+          console.error("Failed to delete information from the database");
           return res.status(404).json({ message: "Information not found" });
         }
 
         res.status(200).json({ message: "Information deleted successfully" });
       } catch (error) {
-        console.error(error);
+        console.error("Error deleting information:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
+
     // Registration Endpoint
     app.post("/register", async (req, res) => {
       try {
@@ -572,7 +577,7 @@ async function run() {
     /* Amount Deposit Information */
     app.post("/deposit-info", verifyAuthToken, async (req, res) => {
       try {
-        const { amount, userID, phone, tnxID, paymentMethod, project } =
+        const { amount, userID, phone, tnxID, paymentMethod, project, status } =
           req.body;
 
         // Check if all required fields are provided
@@ -588,6 +593,7 @@ async function run() {
           tnxID,
           paymentMethod,
           project,
+          status,
           depositDate: new Date(),
         });
 
@@ -607,6 +613,39 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    /* update deposit status */
+    app.post("/update-deposit-status", verifyAuthToken, async (req, res) => {
+      try {
+        const { status, id } = req.body;
+
+        // Check if user existsx
+        const deposit = await database
+          .collection("deposit")
+          .findOne({ _id: ObjectId(id) });
+        if (!deposit) {
+          return res
+            .status(404)
+            .json({ message: "Deposit History not found!" });
+        }
+
+        // Update user role
+        await database
+          .collection("deposit")
+          .updateOne({ _id: ObjectId(id) }, { $set: { status } });
+
+        const updatedDeposit = await database
+          .collection("deposit")
+          .findOne({ _id: ObjectId(id) });
+
+        res.status(200).json({
+          message: "Status updated successfully",
+          user: updatedDeposit,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     app.get("/deposit-info", verifyAuthToken, async (req, res) => {
       try {
@@ -621,23 +660,35 @@ async function run() {
     });
 
     /*  deposit get which is created */
-    app.get("/deposit-info-user", verifyAuthToken, async (req, res) => {
+    app.get("/deposit-info/:userID", verifyAuthToken, async (req, res) => {
       try {
-        // Verify token and get user ID
-        const userId = req.userId;
+        const { userID } = req.params;
 
-        // Fetch all submitted information for the user
-        const submittedInfo = await database
+        // Check if userID is provided
+        if (!userID) {
+          return res.status(400).json({ message: "userID is required" });
+        }
+
+        // Find all deposit records for the given userID
+        const deposits = await database
           .collection("deposit")
-          .find({ userId: ObjectId(userId) })
+          .find({ userID: userID })
           .toArray();
 
-        res.status(200).json(submittedInfo);
+        // Check if deposits were found
+        if (deposits.length === 0) {
+          return res
+            .status(404)
+            .json({ message: "No deposits found for the given userID" });
+        }
+
+        res.status(200).json({ deposits });
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching deposit information:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
+
     // Delete Information Endpoint
     app.delete("/deposit-info/:id", verifyAuthToken, async (req, res) => {
       try {
