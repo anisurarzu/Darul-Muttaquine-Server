@@ -758,7 +758,7 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
-    app.get("/project-info", verifyAuthToken, async (req, res) => {
+    app.get("/project-info", async (req, res) => {
       try {
         // Fetch all users from the database
         const users = await database.collection("project").find().toArray();
