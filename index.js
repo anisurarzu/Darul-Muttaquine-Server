@@ -481,7 +481,7 @@ async function run() {
       const secretKey = process.env.JWT_SECRET || "your-secret-key";
 
       // Generate token
-      const token = jwt.sign({ userId }, secretKey, { expiresIn: "1h" });
+      const token = jwt.sign({ userId }, secretKey, { expiresIn: "5h" });
 
       return token;
     }
