@@ -577,17 +577,24 @@ async function run() {
     /* Amount Deposit Information */
     app.post("/deposit-info", verifyAuthToken, async (req, res) => {
       try {
-        const { amount, userID, phone, tnxID, paymentMethod, project, status } =
-          req.body;
+        const {
+          amount,
+          userName,
+          phone,
+          tnxID,
+          paymentMethod,
+          project,
+          status,
+        } = req.body;
 
         // Check if all required fields are provided
-        if (!amount || !userID || !phone || !tnxID) {
+        if (!amount || !phone || !tnxID) {
           return res.status(400).json({ message: "All fields are required" });
         }
 
         // Insert the submitted information into the database
         const result = await database.collection("deposit").insertOne({
-          userID,
+          userName,
           amount,
           phone,
           tnxID,
