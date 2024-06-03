@@ -251,6 +251,70 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    // Suggestion Box
+
+    app.post("/suggestion-info", verifyAuthToken, async (req, res) => {
+      try {
+        const { title, description } = req.body;
+
+        // Insert the submitted information into the database
+        const result = await database.collection("suggestions").insertOne({
+          title,
+          description,
+          createdAt: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(200).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.get("/suggestion-info", verifyAuthToken, async (req, res) => {
+      try {
+        const suggestionInfo = await database
+          .collection("suggestions")
+          .find()
+          .toArray();
+        res.status(200).json(suggestionInfo);
+      } catch (error) {
+        console.error("Error retrieving suggestions information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.delete("/suggestion-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        // Attempt to delete the document with the specified id from the database
+        const result = await database
+          .collection("suggestions")
+          .deleteOne({ _id: new ObjectId(id) });
+
+        console.log("Deletion result:", result);
+
+        // Check if the deletion was successful
+        if (result.deletedCount === 0) {
+          console.error("Failed to delete information from the database");
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     // Registration Endpoint
     app.post("/register", async (req, res) => {
@@ -728,6 +792,8 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+
+          projectCoordinators,
           projectFund,
           image,
           details,
@@ -742,6 +808,7 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+          projectCoordinators,
           projectFund,
           image,
           details,
@@ -777,6 +844,7 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+          projectCoordinators,
           projectFund,
           image,
           details,
@@ -784,6 +852,7 @@ async function run() {
           yesVote,
           noVote,
         } = req.body;
+        console.log("projectId", projectLeader);
 
         // Construct the update object
         const updateData = {
@@ -791,6 +860,7 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+          projectCoordinators,
           projectFund,
           image,
           details,
@@ -827,10 +897,14 @@ async function run() {
 
     app.get("/project-info", async (req, res) => {
       try {
-        // Fetch all users from the database
-        const users = await database.collection("project").find().toArray();
-        // Send the list of users in the response
-        res.status(200).json(users);
+        // Fetch all projects from the database excluding those with approvalStatus as "Delete"
+        const projects = await database
+          .collection("project")
+          .find({ approvalStatus: { $ne: "Delete" } })
+          .toArray();
+
+        // Send the list of projects in the response
+        res.status(200).json(projects);
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
@@ -876,22 +950,28 @@ async function run() {
       try {
         const id = req.params.id;
 
-        // Delete the information from the database
-        const result = await database.collection("project").deleteOne({
-          _id: ObjectId(id),
-        });
+        // Update the approvalStatus to "Delete" instead of deleting the document
+        const result = await database
+          .collection("project")
+          .updateOne(
+            { _id: ObjectId(id) },
+            { $set: { approvalStatus: "Delete" } }
+          );
 
-        // Check if the deletion was successful
-        if (result.deletedCount !== 1) {
+        // Check if the update was successful
+        if (result.modifiedCount !== 1) {
           return res.status(404).json({ message: "Information not found" });
         }
 
-        res.status(200).json({ message: "Information deleted successfully" });
+        res
+          .status(200)
+          .json({ message: "Information status updated to 'Delete'" });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
     });
+
     /* 
     Result Information
     */
@@ -1319,6 +1399,32 @@ async function run() {
         res.status(200).json({ message: "Information deleted successfully" });
       } catch (error) {
         console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* ----------------------   drop down */
+    app.get("/usersDropdown", async (req, res) => {
+      try {
+        // Fetch users with unique IDs from the database and create the username by joining firstName and lastName
+        const users = await database
+          .collection("users")
+          .find({ uniqueId: { $exists: true } })
+          .toArray();
+
+        if (!users || users.length === 0) {
+          return res.status(404).json({ message: "No users found" });
+        }
+
+        const usernames = users.map((user) => ({
+          _id: user._id,
+          username: `${user.firstName} ${user.lastName}`,
+        }));
+
+        // Send the list of usernames in the response
+        res.status(200).json(usernames);
+      } catch (error) {
+        console.error("Error fetching users:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
