@@ -580,6 +580,7 @@ async function run() {
         const {
           amount,
           userName,
+          userID,
           phone,
           tnxID,
           paymentMethod,
@@ -601,6 +602,7 @@ async function run() {
           paymentMethod,
           project,
           status,
+          userID,
           depositDate: new Date(),
         });
 
