@@ -767,6 +767,64 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    /* update project */
+    app.put("/update-project-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const projectId = req.params.id;
+        console.log("projectId", projectId);
+        const {
+          projectName,
+          startDate,
+          endDate,
+          projectLeader,
+          projectFund,
+          image,
+          details,
+          approvalStatus,
+          yesVote,
+          noVote,
+        } = req.body;
+
+        // Construct the update object
+        const updateData = {
+          projectName,
+          startDate,
+          endDate,
+          projectLeader,
+          projectFund,
+          image,
+          details,
+          approvalStatus,
+          yesVote,
+          noVote,
+          updatedAt: new Date(), // Add updated date
+        };
+
+        // Filter out undefined values to avoid updating fields to undefined
+        Object.keys(updateData).forEach(
+          (key) => updateData[key] === undefined && delete updateData[key]
+        );
+
+        // Update the project information in the database
+        const result = await database
+          .collection("project")
+          .updateOne({ _id: new ObjectId(projectId) }, { $set: updateData });
+
+        console.log("Update result:", result);
+
+        // Check if the update was successful
+        if (result.matchedCount === 0) {
+          console.error("No project found with the given ID");
+          return res.status(404).json({ message: "Project not found" });
+        }
+
+        res.status(200).json({ message: "Information updated successfully" });
+      } catch (error) {
+        console.error("Error updating information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     app.get("/project-info", async (req, res) => {
       try {
         // Fetch all users from the database
