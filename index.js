@@ -981,6 +981,7 @@ async function run() {
           presentAddress,
           bloodGroup,
           image,
+          dateOfBirth,
         } = req.body;
 
         // Check if all required fields are provided
@@ -990,7 +991,8 @@ async function run() {
           !phone ||
           !gender ||
           !presentAddress ||
-          !bloodGroup
+          !bloodGroup ||
+          !dateOfBirth
         ) {
           return res.status(400).json({ message: "All fields are required" });
         }
@@ -1014,6 +1016,7 @@ async function run() {
           gender,
           presentAddress,
           bloodGroup,
+          dateOfBirth,
           image,
           submittedAt: new Date(),
         });
@@ -1156,6 +1159,156 @@ async function run() {
         // Delete the information from the database
         const result = await database.collection("scholarship").deleteOne({
           _id: ObjectId(scholarshipId),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* cost information */
+    /* ========================================= */
+    /* Amount Deposit Information */
+    app.post("/cost-info", verifyAuthToken, async (req, res) => {
+      try {
+        const {
+          amount,
+          userName,
+          userID,
+          phone,
+          invoice,
+          paymentMethod,
+          project,
+          description,
+          status,
+        } = req.body;
+
+        // Check if all required fields are provided
+        if (!amount || !phone || !tnxID) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Insert the submitted information into the database
+        const result = await database.collection("costInfo").insertOne({
+          amount,
+          userName,
+          userID,
+          phone,
+          invoice,
+          paymentMethod,
+          project,
+          description,
+          status,
+          depositDate: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(201).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    /* update deposit status */
+    app.post("/update-cost-status", verifyAuthToken, async (req, res) => {
+      try {
+        const { status, id } = req.body;
+
+        // Check if user existsx
+        const deposit = await database
+          .collection("costInfo")
+          .findOne({ _id: ObjectId(id) });
+        if (!deposit) {
+          return res
+            .status(404)
+            .json({ message: "Deposit History not found!" });
+        }
+
+        // Update user role
+        await database
+          .collection("costInfo")
+          .updateOne({ _id: ObjectId(id) }, { $set: { status } });
+
+        const updatedDeposit = await database
+          .collection("costInfo")
+          .findOne({ _id: ObjectId(id) });
+
+        res.status(200).json({
+          message: "Status updated successfully",
+          user: updatedDeposit,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/cost-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("costInfo").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /*  deposit get which is created */
+    app.get("/cost-info/:userID", verifyAuthToken, async (req, res) => {
+      try {
+        const { userID } = req.params;
+
+        // Check if userID is provided
+        if (!userID) {
+          return res.status(400).json({ message: "userID is required" });
+        }
+
+        // Find all deposit records for the given userID
+        const deposits = await database
+          .collection("costInfo")
+          .find({ userID: userID })
+          .toArray();
+
+        // Check if deposits were found
+        if (deposits.length === 0) {
+          return res
+            .status(404)
+            .json({ message: "No deposits found for the given userID" });
+        }
+
+        res.status(200).json({ deposits });
+      } catch (error) {
+        console.error("Error fetching deposit information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Delete Information Endpoint
+    app.delete("/cost-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("costInfo").deleteOne({
+          _id: ObjectId(id),
         });
 
         // Check if the deletion was successful
