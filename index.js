@@ -1262,16 +1262,16 @@ async function run() {
           amount,
           userName,
           userID,
-          phone,
           invoice,
           paymentMethod,
           project,
           description,
           status,
+          reason,
         } = req.body;
 
         // Check if all required fields are provided
-        if (!amount || !phone || !tnxID) {
+        if (!amount || !reason) {
           return res.status(400).json({ message: "All fields are required" });
         }
 
@@ -1280,13 +1280,13 @@ async function run() {
           amount,
           userName,
           userID,
-          phone,
           invoice,
           paymentMethod,
           project,
           description,
           status,
-          depositDate: new Date(),
+          reason,
+          requestDate: new Date(),
         });
 
         console.log("Insertion result:", result);
@@ -1308,30 +1308,34 @@ async function run() {
     /* update deposit status */
     app.post("/update-cost-status", verifyAuthToken, async (req, res) => {
       try {
-        const { status, id } = req.body;
+        const { status, project, id } = req.body;
 
-        // Check if user existsx
-        const deposit = await database
+        // Check if the deposit exists
+        const cost = await database
           .collection("costInfo")
           .findOne({ _id: ObjectId(id) });
-        if (!deposit) {
+        if (!cost) {
           return res
             .status(404)
             .json({ message: "Deposit History not found!" });
         }
 
-        // Update user role
-        await database
-          .collection("costInfo")
-          .updateOne({ _id: ObjectId(id) }, { $set: { status } });
+        // Update the document with the new fields
+        const acceptedDate = new Date();
+        await database.collection("costInfo").updateOne(
+          { _id: ObjectId(id) },
+          {
+            $set: { status, acceptedDate, project, acceptedDate },
+          }
+        );
 
-        const updatedDeposit = await database
+        const updatedCost = await database
           .collection("costInfo")
           .findOne({ _id: ObjectId(id) });
 
         res.status(200).json({
           message: "Status updated successfully",
-          user: updatedDeposit,
+          user: updatedCost,
         });
       } catch (error) {
         console.error(error);
