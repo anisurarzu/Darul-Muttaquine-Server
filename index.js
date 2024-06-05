@@ -844,7 +844,9 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+          projectLeaderImage,
           projectCoordinators,
+          projectCoordinatorImages,
           projectFund,
           image,
           details,
@@ -860,7 +862,9 @@ async function run() {
           startDate,
           endDate,
           projectLeader,
+          projectLeaderImage,
           projectCoordinators,
+          projectCoordinatorImages,
           projectFund,
           image,
           details,
@@ -1423,6 +1427,7 @@ async function run() {
         const usernames = users.map((user) => ({
           _id: user._id,
           username: `${user.firstName} ${user.lastName}`,
+          image: user.image,
         }));
 
         // Send the list of usernames in the response
