@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const { MongoClient, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
+const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
 const swaggerJsdoc = require("swagger-jsdoc");
@@ -151,10 +152,11 @@ async function run() {
     /* insert history */
     app.post("/history-info", verifyAuthToken, async (req, res) => {
       try {
-        const { name, subtitle, description, image } = req.body;
+        const { projectName, name, subtitle, description, image } = req.body;
 
         // Insert the submitted information into the database
         const result = await database.collection("historyInfo").insertOne({
+          projectName,
           name,
           subtitle,
           description,
@@ -350,6 +352,72 @@ async function run() {
         await sendVerificationEmail(email, verificationToken);
 
         res.status(201).json({ message: "User registered successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* forget password api */
+
+    // Function to generate a password reset token
+    function generateResetToken() {
+      return crypto.randomBytes(20).toString("hex");
+    }
+
+    // Function to send password reset email
+    async function sendResetEmail(email, resetToken) {
+      // Setup your email transporter (e.g., using nodemailer)
+      const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+          user: "your-email@gmail.com",
+          pass: "your-email-password",
+        },
+      });
+
+      const mailOptions = {
+        from: "your-email@gmail.com",
+        to: email,
+        subject: "Password Reset Request",
+        text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n
+    Please click on the following link, or paste this into your browser to complete the process:\n\n
+    http://localhost:3000/reset/${resetToken}\n\n
+    If you did not request this, please ignore this email and your password will remain unchanged.\n`,
+      };
+
+      await transporter.sendMail(mailOptions);
+    }
+
+    // Forgot password endpoint
+    app.post("/forgot-password", async (req, res) => {
+      try {
+        const { email } = req.body;
+
+        // Check if user exists
+        const user = await database.collection("users").findOne({ email });
+        if (!user) {
+          return res.status(400).json({ message: "User not found" });
+        }
+
+        // Generate password reset token
+        const resetToken = generateResetToken();
+
+        // Store the reset token in the database with an expiration time (e.g., 1 hour)
+        await database.collection("users").updateOne(
+          { email },
+          {
+            $set: {
+              resetToken,
+              resetTokenExpires: new Date(Date.now() + 3600000), // 1 hour from now
+            },
+          }
+        );
+
+        // Send password reset email
+        await sendResetEmail(email, resetToken);
+
+        res.status(200).json({ message: "Password reset email sent" });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
@@ -1052,7 +1120,7 @@ async function run() {
 
     // Submit Information Endpoint
     // Submit Information Endpoint
-    app.post("/scholarship-info", verifyAuthToken, async (req, res) => {
+    app.post("/scholarship-info", async (req, res) => {
       try {
         const {
           name,
@@ -1134,7 +1202,7 @@ async function run() {
     }
 
     // Endpoint to retrieve all submitted information
-    app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
+    app.get("/scholarship-info", async (req, res) => {
       try {
         // Verify token and get user ID
         const userId = req.userId;
@@ -1156,7 +1224,7 @@ async function run() {
 
     // Assuming `database` is your MongoDB database connection
 
-    app.get("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+    app.get("/scholarship-info/:id", async (req, res) => {
       try {
         const scholarshipId = req.params.id;
 
@@ -1184,7 +1252,7 @@ async function run() {
     });
 
     // Update Information Endpoint
-    app.put("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+    app.put("/scholarship-info/:id", async (req, res) => {
       try {
         const scholarshipId = req.params.id;
         const {
@@ -1236,7 +1304,7 @@ async function run() {
     });
 
     // Delete Information Endpoint
-    app.delete("/scholarship-info/:id", verifyAuthToken, async (req, res) => {
+    app.delete("/scholarship-info/:id", async (req, res) => {
       try {
         const scholarshipId = req.params.id;
 
