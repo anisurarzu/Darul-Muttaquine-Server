@@ -149,6 +149,7 @@ async function run() {
       }
     );
 
+    /* insert  history information */
     app.post("/history-info", verifyAuthToken, async (req, res) => {
       try {
         const { projectName, name, subtitle, description, image } = req.body;
