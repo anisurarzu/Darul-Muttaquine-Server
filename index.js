@@ -154,7 +154,6 @@ async function run() {
       try {
         const { projectName, name, subtitle, description, image } = req.body;
 
-        // Insert the submitted information into the database
         const result = await database.collection("historyInfo").insertOne({
           projectName,
           name,
@@ -718,6 +717,7 @@ async function run() {
           paymentMethod,
           project,
           status,
+          depositDate,
         } = req.body;
 
         // Check if all required fields are provided
@@ -735,7 +735,7 @@ async function run() {
           project,
           status,
           userID,
-          depositDate: new Date(),
+          depositDate: depositDate || new Date(),
         });
 
         console.log("Insertion result:", result);
