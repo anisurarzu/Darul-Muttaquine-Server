@@ -704,6 +704,59 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    //end point for delete user
+    app.delete("/user/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("users").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.post("/update-deposit-status", verifyAuthToken, async (req, res) => {
+      try {
+        const { status, id } = req.body;
+
+        // Check if user existsx
+        const deposit = await database
+          .collection("deposit")
+          .findOne({ _id: ObjectId(id) });
+        if (!deposit) {
+          return res
+            .status(404)
+            .json({ message: "Deposit History not found!" });
+        }
+
+        // Update user role
+        await database
+          .collection("deposit")
+          .updateOne({ _id: ObjectId(id) }, { $set: { status } });
+
+        const updatedDeposit = await database
+          .collection("deposit")
+          .findOne({ _id: ObjectId(id) });
+
+        res.status(200).json({
+          message: "Status updated successfully",
+          user: updatedDeposit,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     /* Amount Deposit Information */
     app.post("/deposit-info", verifyAuthToken, async (req, res) => {
@@ -1047,28 +1100,48 @@ async function run() {
     /* 
     Result Information
     */
+    const { ObjectId } = require("mongodb");
+
     app.post("/add-result", verifyAuthToken, async (req, res) => {
       try {
         const { scholarshipRollNumber, resultDetails } = req.body;
 
-        console.log("--", scholarshipRollNumber);
-
-        /*  // Check if all required fields are provided
-        if (!scholarshipRollNumber || !Array.isArray(resultDetails)) {
+        // Check if all required fields are provided
+        if (!scholarshipRollNumber) {
           return res.status(400).json({
             message: "scholarshipRollNumber and resultDetails are required",
           });
-        } */
+        }
 
         // Get the user ID from the token
         const userId = req.userId;
 
-        // Find the scholarship document and update the resultDetails array
+        // Find the scholarship document
+        const scholarship = await database
+          .collection("scholarship")
+          .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+
+        if (!scholarship) {
+          return res.status(404).json({ message: "Scholarship not found" });
+        }
+
+        // Check if scholarshipRollNumber already exists in resultDetails
+        const exists = scholarship.resultDetails.some(
+          (detail) => detail.scholarshipRollNumber === scholarshipRollNumber
+        );
+
+        if (exists) {
+          return res
+            .status(409)
+            .json({ message: "Result details already added" });
+        }
+
+        // Update the resultDetails array
         const result = await database.collection("scholarship").updateOne(
           { scholarshipRollNumber: scholarshipRollNumber },
           {
             $set: { userId: ObjectId(userId) },
-            $push: { resultDetails: { $each: [resultDetails] } },
+            $push: { resultDetails: { $each: resultDetails } },
           }
         );
 
@@ -1202,7 +1275,7 @@ async function run() {
     }
 
     // Endpoint to retrieve all submitted information
-    app.get("/scholarship-info", async (req, res) => {
+    app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
       try {
         // Verify token and get user ID
         const userId = req.userId;
@@ -1220,7 +1293,17 @@ async function run() {
       }
     });
 
-    const { ObjectId } = require("mongodb");
+    /*  app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("scholarship").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    }); */
 
     // Assuming `database` is your MongoDB database connection
 
