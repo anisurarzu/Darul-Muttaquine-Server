@@ -1589,6 +1589,124 @@ async function run() {
       }
     });
 
+    /* -----------------------------quize---------------*/
+    // Quiz API routes
+
+    app.post("/quizzes", async (req, res) => {
+      try {
+        const { quizName, startDate, endDate, quizQuestions } = req.body;
+
+        // Ensure quizQuestions is an array and not empty
+        if (!Array.isArray(quizQuestions) || quizQuestions.length === 0) {
+          return res
+            .status(400)
+            .json({ message: "Invalid quiz questions format" });
+        }
+
+        // Insert the submitted information into the database
+        const result = await database.collection("quizzes").insertOne({
+          quizName,
+          startDate,
+          endDate,
+          quizQuestions,
+        });
+
+        res.status(200).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/quizzes", async (req, res) => {
+      try {
+        const quizzes = await database.collection("quizzes").find().toArray();
+        res.status(200).json(quizzes);
+      } catch (error) {
+        console.error("Error fetching quizzes:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/quizzes/:id", async (req, res) => {
+      try {
+        const quizId = req.params.id;
+        const quiz = await database
+          .collection("quizzes")
+          .findOne({ _id: new ObjectId(quizId) });
+        if (!quiz) {
+          return res.status(404).json({ message: "Quiz not found" });
+        }
+        res.status(200).json(quiz);
+      } catch (error) {
+        console.error("Error fetching quiz:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.delete("/quizzes/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const quizId = req.params.id;
+        const result = await database
+          .collection("quizzes")
+          .deleteOne({ _id: new ObjectId(quizId) });
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Quiz not found" });
+        }
+        res.status(200).json({ message: "Quiz deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting quiz:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.post("/quizzes-answer", async (req, res) => {
+      try {
+        const { quizID, userId, answers } = req.body;
+
+        const userAnswer = {
+          quizID,
+          userId,
+          answers,
+          submittedAt: new Date(),
+        };
+
+        const result = await database.collection("quizzes").updateOne(
+          { _id: new ObjectId(quizID) }, // Changed quizId to quizID
+          { $push: { userAnswers: userAnswer } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Quiz not found" });
+        }
+        res.status(200).json({ message: "Answers submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting answers:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/quizzes/:id/answers", verifyAuthToken, async (req, res) => {
+      try {
+        const quizId = req.params.id;
+        const quiz = await database
+          .collection("quizzes")
+          .findOne(
+            { _id: new ObjectId(quizId) },
+            { projection: { userAnswers: 1 } }
+          );
+
+        if (!quiz) {
+          return res.status(404).json({ message: "Quiz not found" });
+        }
+
+        res.status(200).json(quiz.userAnswers || []);
+      } catch (error) {
+        console.error("Error fetching user answers:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
       const token = req.headers.authorization?.split(" ")[1];
