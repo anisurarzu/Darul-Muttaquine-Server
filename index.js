@@ -1687,23 +1687,54 @@ async function run() {
       }
     });
 
-    app.get("/quizzes/:id/answers", verifyAuthToken, async (req, res) => {
+    app.get("/quizzes-results/:quizID", async (req, res) => {
       try {
-        const quizId = req.params.id;
+        const { quizID } = req.params;
+
+        if (!ObjectId.isValid(quizID)) {
+          return res.status(400).json({ message: "Invalid quizID format" });
+        }
+
+        console.log("Received quizID:", quizID);
         const quiz = await database
           .collection("quizzes")
-          .findOne(
-            { _id: new ObjectId(quizId) },
-            { projection: { userAnswers: 1 } }
-          );
+          .findOne({ _id: new ObjectId(quizID) });
 
         if (!quiz) {
           return res.status(404).json({ message: "Quiz not found" });
         }
 
-        res.status(200).json(quiz.userAnswers || []);
+        const userIds = quiz.userAnswers.map((answer) => answer.userId);
+        console.log("User IDs from userAnswers:", userIds);
+
+        const users = await database
+          .collection("users")
+          .find({ uniqueId: { $in: userIds } })
+          .toArray();
+
+        console.log("Fetched users:", users);
+
+        const results = quiz.userAnswers
+          .map((answer) => {
+            const user = users.find((user) => user.uniqueId === answer.userId);
+            const totalMarks = answer.answers.reduce(
+              (sum, ans) => sum + (ans.mark || 0),
+              0
+            );
+
+            return user
+              ? {
+                  name: user.firstName + " " + user.lastName,
+                  image: user.image,
+                  totalMarks: totalMarks,
+                }
+              : null;
+          })
+          .filter((result) => result !== null);
+
+        res.status(200).json(results);
       } catch (error) {
-        console.error("Error fetching user answers:", error);
+        console.error("Error retrieving quiz results:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
