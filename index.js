@@ -1662,12 +1662,13 @@ async function run() {
 
     app.post("/quizzes-answer", async (req, res) => {
       try {
-        const { quizID, userId, answers } = req.body;
+        const { quizID, userId, answers, isSubmitted } = req.body;
 
         const userAnswer = {
           quizID,
           userId,
           answers,
+          isSubmitted,
           submittedAt: new Date(),
         };
 
