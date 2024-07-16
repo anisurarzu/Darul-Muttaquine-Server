@@ -344,6 +344,7 @@ async function run() {
           email,
           password: hashedPassword,
           verificationToken,
+          userRole: "Visitor",
           createdAt: new Date(),
         });
 
