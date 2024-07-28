@@ -337,27 +337,26 @@ async function run() {
         const hashedPassword = await bcrypt.hash(password, 10); // Use 10 rounds of salt
 
         // Generate unique ID if it doesn't exist
-        if (!user.uniqueId) {
-          const uniqueId = await generateUniqueId();
 
-          // Insert new user into the database with hashed password and verification token
-          await database.collection("users").insertOne({
-            firstName,
-            lastName,
-            username,
-            email,
-            password: hashedPassword,
-            verificationToken,
-            userRole: "Visitor",
-            uniqueId: uniqueId,
-            createdAt: new Date(),
-          });
+        const uniqueId = await generateUniqueID();
 
-          // Send verification email
-          await sendVerificationEmail(email, verificationToken);
+        // Insert new user into the database with hashed password and verification token
+        await database.collection("users").insertOne({
+          firstName,
+          lastName,
+          username,
+          email,
+          password: hashedPassword,
+          verificationToken,
+          userRole: "Visitor",
+          createdAt: new Date(),
+          uniqueId,
+        });
 
-          res.status(201).json({ message: "User registered successfully" });
-        }
+        // Send verification email
+        await sendVerificationEmail(email, verificationToken);
+
+        res.status(201).json({ message: "User registered successfully" });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
@@ -508,6 +507,13 @@ async function run() {
       }
       return uniqueId;
     };
+
+    const generateUniqueID = () => {
+      const min = 1000; // Minimum 5-digit number
+      const max = 99999; // Maximum 5-digit number
+      const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+      return `DMF-${randomNumber}`;
+    };
     // Update the /update-user endpoint in your server code
 
     app.post("/update-user", verifyAuthToken, async (req, res) => {
@@ -539,13 +545,13 @@ async function run() {
         }
 
         // Generate unique ID if it doesn't exist
-        if (!user.uniqueId) {
-          const uniqueId = await generateUniqueId();
-          user.uniqueId = uniqueId;
-          await database
-            .collection("users")
-            .updateOne({ email: email }, { $set: { uniqueId } });
-        }
+        // if (!user.uniqueId) {
+        //   const uniqueId = await generateUniqueId();
+        //   user.uniqueId = uniqueId;
+        //   await database
+        //     .collection("users")
+        //     .updateOne({ email: email }, { $set: { uniqueId } });
+        // }
 
         // Update existing user details
         const updatedData = {
@@ -1596,12 +1602,13 @@ async function run() {
       }
     });
 
-    /* -----------------------------quize---------------*/
+    /* -----------------------------quizze---------------*/
     // Quiz API routes
 
     app.post("/quizzes", async (req, res) => {
       try {
-        const { quizName, startDate, endDate, quizQuestions } = req.body;
+        const { quizName, startDate, endDate, quizQuestions, duration } =
+          req.body;
 
         // Ensure quizQuestions is an array and not empty
         if (!Array.isArray(quizQuestions) || quizQuestions.length === 0) {
@@ -1615,7 +1622,9 @@ async function run() {
           quizName,
           startDate,
           endDate,
+          duration,
           quizQuestions,
+          createdAt: new Date(),
         });
 
         res.status(200).json({ message: "Information submitted successfully" });
