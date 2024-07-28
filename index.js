@@ -336,22 +336,28 @@ async function run() {
         // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10); // Use 10 rounds of salt
 
-        // Insert new user into the database with hashed password and verification token
-        await database.collection("users").insertOne({
-          firstName,
-          lastName,
-          username,
-          email,
-          password: hashedPassword,
-          verificationToken,
-          userRole: "Visitor",
-          createdAt: new Date(),
-        });
+        // Generate unique ID if it doesn't exist
+        if (!user.uniqueId) {
+          const uniqueId = await generateUniqueId();
 
-        // Send verification email
-        await sendVerificationEmail(email, verificationToken);
+          // Insert new user into the database with hashed password and verification token
+          await database.collection("users").insertOne({
+            firstName,
+            lastName,
+            username,
+            email,
+            password: hashedPassword,
+            verificationToken,
+            userRole: "Visitor",
+            uniqueId: uniqueId,
+            createdAt: new Date(),
+          });
 
-        res.status(201).json({ message: "User registered successfully" });
+          // Send verification email
+          await sendVerificationEmail(email, verificationToken);
+
+          res.status(201).json({ message: "User registered successfully" });
+        }
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
