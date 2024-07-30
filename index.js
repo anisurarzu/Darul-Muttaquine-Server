@@ -1605,7 +1605,7 @@ async function run() {
     /* -----------------------------quizze---------------*/
     // Quiz API routes
 
-    app.post("/quizzes", async (req, res) => {
+    app.post("/quizzes", verifyAuthToken, async (req, res) => {
       try {
         const { quizName, startDate, endDate, quizQuestions, duration } =
           req.body;
@@ -1630,6 +1630,33 @@ async function run() {
         res.status(200).json({ message: "Information submitted successfully" });
       } catch (error) {
         console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    //update quize status
+    app.patch("/quizzes", verifyAuthToken, async (req, res) => {
+      try {
+        // const quizId = req.params.id;
+        const { quizId, status } = req.body;
+
+        // Ensure status is provided
+        if (!status) {
+          return res.status(400).json({ message: "Status is required" });
+        }
+
+        // Update the status of the quiz
+        const result = await database
+          .collection("quizzes")
+          .updateOne({ _id: new ObjectId(quizId) }, { $set: { status } });
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Quiz not found" });
+        }
+
+        res.status(200).json({ message: "Status updated successfully" });
+      } catch (error) {
+        console.error("Error updating status:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
@@ -1754,7 +1781,9 @@ async function run() {
         res.status(200).json(results);
       } catch (error) {
         console.error("Error retrieving quiz results:", error);
-        res.status(500).json({ message: "Server Error" });
+        res
+          .status(500)
+          .json({ message: "No One Can Join The Party! / Server Error" });
       }
     });
 
