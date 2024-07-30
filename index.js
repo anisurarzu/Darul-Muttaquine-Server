@@ -1678,7 +1678,7 @@ async function run() {
 
     app.post("/quizzes-answer", async (req, res) => {
       try {
-        const { quizID, userId, answers, isSubmitted ,answerTime} = req.body;
+        const { quizID, userId, answers, isSubmitted, answerTime } = req.body;
 
         const userAnswer = {
           quizID,
@@ -1738,12 +1738,14 @@ async function run() {
               (sum, ans) => sum + (ans.mark || 0),
               0
             );
+            const answerTime = answer?.answerTime;
 
             return user
               ? {
                   name: user.firstName + " " + user.lastName,
                   image: user.image,
                   totalMarks: totalMarks,
+                  answerTime: answerTime,
                 }
               : null;
           })
