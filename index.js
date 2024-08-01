@@ -1248,7 +1248,7 @@ async function run() {
           parentName,
           instituteClass,
           instituteRollNumber,
-          scholarshipRollNumber: scholarshipRollNumber, // Assign scholarship roll number directly
+          scholarshipRollNumber, // Assign scholarship roll number directly
           institute,
           phone,
           gender,
@@ -1269,7 +1269,10 @@ async function run() {
             .json({ message: "Failed to submit information" });
         }
 
-        res.status(201).json({ message: "Information submitted successfully" });
+        res.status(201).json({
+          message: "Information submitted successfully",
+          scholarshipRollNumber, // Include the scholarship roll number in the response
+        });
       } catch (error) {
         console.error("Error submitting information:", error);
         res.status(500).json({ message: "Server Error" });
@@ -1287,11 +1290,12 @@ async function run() {
       return scholarshipRollNumber;
     }
 
-    // Endpoint to retrieve all submitted information
+    /*  // Endpoint to retrieve all submitted information
     app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
       try {
         // Verify token and get user ID
         const userId = req.userId;
+        console.log("hit", userId);
 
         // Fetch all submitted information for the user
         const submittedInfo = await database
@@ -1300,13 +1304,14 @@ async function run() {
           .toArray();
 
         res.status(200).json(submittedInfo);
+        console.log("submittedInfo", submittedInfo);
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
-    });
+    }); */
 
-    /*  app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
+    app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
       try {
         // Fetch all users from the database
         const users = await database.collection("scholarship").find().toArray();
@@ -1316,7 +1321,7 @@ async function run() {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
-    }); */
+    });
 
     // Assuming `database` is your MongoDB database connection
 
@@ -1332,7 +1337,7 @@ async function run() {
         // Query the database for the scholarship information
         const scholarship = await database.collection("scholarship").findOne({
           _id: ObjectId(scholarshipId),
-          userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
+          // userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
         });
 
         // Check if the scholarship exists
@@ -1346,6 +1351,42 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    // get data by scholarship roll
+    app.get(
+      "/scholarship-roll-info/:scholarshipRollNumber",
+      verifyAuthToken,
+      async (req, res) => {
+        try {
+          // Extract scholarshipRollNumber from request parameters
+          const { scholarshipRollNumber } = req.params;
+
+          // Validate scholarshipRollNumber parameter
+          if (!scholarshipRollNumber) {
+            return res
+              .status(400)
+              .json({ message: "Scholarship Roll Number is required" });
+          }
+
+          // Fetch submitted information for the provided scholarshipRollNumber
+          const submittedInfo = await database
+            .collection("scholarship")
+            .findOne({ scholarshipRollNumber });
+
+          // Check if any data was found
+          if (!submittedInfo) {
+            return res.status(404).json({
+              message: "No data found for the provided scholarship roll number",
+            });
+          }
+
+          // Send the data back as JSON response
+          res.status(200).json(submittedInfo);
+        } catch (error) {
+          console.error(error);
+          res.status(500).json({ message: "Server Error" });
+        }
+      }
+    );
 
     // Update Information Endpoint
     app.put("/scholarship-info/:id", async (req, res) => {
