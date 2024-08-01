@@ -472,13 +472,13 @@ async function run() {
         // Find user by email
         const user = await database.collection("users").findOne({ email });
         if (!user) {
-          return res.status(401).json({ message: "Invalid credentials" });
+          return res.status(401).json({ message: "Wrong Email" });
         }
 
         // Compare passwords
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) {
-          return res.status(401).json({ message: "Invalid credentials" });
+          return res.status(401).json({ message: "Wrong Password" });
         }
 
         // Generate JWT token
