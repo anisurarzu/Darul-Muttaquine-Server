@@ -917,6 +917,133 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    /* quiz deposit information */
+    app.post("/quiz-money", verifyAuthToken, async (req, res) => {
+      try {
+        const {
+          amount,
+          userName,
+          userID,
+          phone,
+          tnxID,
+          paymentMethod,
+          project,
+          status,
+          depositDate,
+        } = req.body;
+
+        // Check if all required fields are provided
+
+        // Insert the submitted information into the database
+        const result = await database.collection("quiz-deposit").insertOne({
+          userName,
+          amount,
+          phone,
+          tnxID,
+          paymentMethod,
+          project,
+          status,
+          userID,
+          depositDate: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        res.status(200).json({ message: "Information submitted successfully" });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/quiz-money", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database
+          .collection("quiz-deposit")
+          .find()
+          .toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.get("/quiz-money/:userID", verifyAuthToken, async (req, res) => {
+      try {
+        const { userID } = req.params;
+
+        // Fetch the user's information from the database based on userID
+        const user = await database
+          .collection("quiz-deposit")
+          .find({ userID: userID })
+          .toArray();
+
+        // If the user is found, send the user's data
+        if (user.length > 0) {
+          res.status(200).json(user);
+        } else {
+          res.status(404).json({ message: "User not found" });
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.put("/quiz-money/:userID/status", verifyAuthToken, async (req, res) => {
+      try {
+        const { userID } = req.params;
+        const { status } = req.body;
+
+        console.log("Updating status for userID:", userID); // Debug log
+        console.log("New status:", status); // Debug log
+
+        // Update the status of the user's quiz money entry in the database
+        const result = await database
+          .collection("quiz-deposit")
+          .updateOne({ userID: userID }, { $set: { status: status } });
+
+        // Check if the document was found and updated
+        if (result.matchedCount > 0) {
+          res.status(200).json({ message: "Status updated successfully" });
+        } else {
+          res.status(404).json({ message: "User not found" });
+        }
+      } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.delete("/quiz-money/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Delete the information from the database
+        const result = await database.collection("quiz-deposit").deleteOne({
+          _id: ObjectId(id),
+        });
+
+        // Check if the deletion was successful
+        if (result.deletedCount !== 1) {
+          return res.status(404).json({ message: "Information not found" });
+        }
+
+        res.status(200).json({ message: "Information deleted successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     /* project information */
     app.post("/add-project-info", verifyAuthToken, async (req, res) => {
@@ -1471,11 +1598,13 @@ async function run() {
           amount,
           userName,
           userID,
+          dmfID,
           invoice,
           paymentMethod,
           project,
           description,
           status,
+          phone,
           reason,
         } = req.body;
 
@@ -1490,10 +1619,12 @@ async function run() {
           userName,
           userID,
           invoice,
+          dmfID,
           paymentMethod,
           project,
           description,
           status,
+          phone,
           reason,
           requestDate: new Date(),
         });
