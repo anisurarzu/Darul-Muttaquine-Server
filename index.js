@@ -318,25 +318,11 @@ async function run() {
     });
 
     // Registration Endpoint
-    const bcrypt = require("bcrypt");
-    const {
-      generateVerificationToken,
-      sendVerificationEmail,
-      generateUniqueID,
-    } = require("./utils");
-
     app.post("/register", async (req, res) => {
       try {
-        const {
-          firstName,
-          lastName,
-          username,
-          email,
-          password,
-          fingerprintToken,
-        } = req.body;
+        const { firstName, lastName, username, email, password } = req.body;
 
-        // Check if the user already exists
+        // Check if user exists
         const existingUser = await database
           .collection("users")
           .findOne({ email });
@@ -347,22 +333,22 @@ async function run() {
         // Generate verification token
         const verificationToken = generateVerificationToken();
 
-        // Hash the password with bcrypt, using 10 rounds of salt
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10); // Use 10 rounds of salt
 
-        // Generate a unique ID for the user
+        // Generate unique ID if it doesn't exist
+
         const uniqueId = await generateUniqueID();
 
-        // Insert the new user into the database with hashed password, verification token, and fingerprint token
+        // Insert new user into the database with hashed password and verification token
         await database.collection("users").insertOne({
           firstName,
           lastName,
           username,
           email,
           password: hashedPassword,
-          fingerprintToken, // Store the fingerprint token
           verificationToken,
-          userRole: "Visitor", // default role set as Visitor
+          userRole: "Visitor",
           createdAt: new Date(),
           uniqueId,
         });
@@ -370,10 +356,9 @@ async function run() {
         // Send verification email
         await sendVerificationEmail(email, verificationToken);
 
-        // Send a success response
         res.status(201).json({ message: "User registered successfully" });
       } catch (error) {
-        console.error("Error during user registration:", error);
+        console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
     });
@@ -482,32 +467,7 @@ async function run() {
     // Login Endpoint
     app.post("/login", async (req, res) => {
       try {
-        const { email, password, fingerprintToken } = req.body;
-
-        if (fingerprintToken) {
-          // If fingerprintToken is provided, validate the fingerprint token
-          // For simplicity, we assume a function validateFingerprintToken is available
-          const isValidFingerprint = validateFingerprintToken(fingerprintToken);
-
-          if (!isValidFingerprint) {
-            return res
-              .status(401)
-              .json({ message: "Fingerprint validation failed" });
-          }
-
-          // Find the user by email associated with the fingerprint
-          const user = await database.collection("users").findOne({ email });
-          if (!user) {
-            return res.status(401).json({ message: "User not found" });
-          }
-
-          // Generate JWT token
-          const token = generateToken(user._id);
-
-          return res.status(200).json({ token });
-        }
-
-        // Fallback to email/password authentication if no fingerprint token is provided
+        const { email, password } = req.body;
 
         // Find user by email
         const user = await database.collection("users").findOne({ email });
@@ -530,14 +490,6 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
-
-    // Example function to validate fingerprint tokens (this is a stub for demonstration)
-    function validateFingerprintToken(fingerprintToken) {
-      // In a real-world scenario, you'd validate the fingerprint token using your
-      // preferred method or a service that handles biometric data.
-      // Here we simply return true for demonstration.
-      return true;
-    }
 
     /* user profile update */
     const generateUniqueId = async () => {
