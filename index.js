@@ -432,7 +432,7 @@ async function run() {
     /* change password api */
     app.post("/change-password", verifyAuthToken, async (req, res) => {
       try {
-        const { oldPassword, newPassword, email } = req.body;
+        const { oldPassword, newPassword, storePassword, email } = req.body;
 
         // Check if user exists
         const user = await database.collection("users").findOne({ email });
@@ -455,7 +455,15 @@ async function run() {
         // Update user's password in the database
         await database
           .collection("users")
-          .updateOne({ email }, { $set: { password: hashedNewPassword } });
+          .updateOne(
+            { email },
+            {
+              $set: {
+                password: hashedNewPassword,
+                storePassword: storePassword,
+              },
+            }
+          );
 
         res.status(200).json({ message: "Password changed successfully" });
       } catch (error) {
@@ -1521,6 +1529,7 @@ async function run() {
         const scholarshipId = req.params.id;
         const {
           name,
+          image,
           parentName,
           instituteClass,
           instituteRollNumber,
@@ -1531,17 +1540,13 @@ async function run() {
           bloodGroup,
         } = req.body;
 
-        // Check if all required fields are provided
-        if (!name || !institute || !phone || !gender || !location) {
-          return res.status(400).json({ message: "All fields are required" });
-        }
-
         // Update the information in the database
         const result = await database.collection("scholarship").updateOne(
           { _id: ObjectId(scholarshipId) },
           {
             $set: {
               name,
+              image,
               parentName,
               instituteClass,
               instituteRollNumber,
