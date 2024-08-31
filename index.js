@@ -453,17 +453,15 @@ async function run() {
         const hashedNewPassword = await bcrypt.hash(newPassword, 10); // Use 10 rounds of salt
 
         // Update user's password in the database
-        await database
-          .collection("users")
-          .updateOne(
-            { email },
-            {
-              $set: {
-                password: hashedNewPassword,
-                storePassword: storePassword,
-              },
-            }
-          );
+        await database.collection("users").updateOne(
+          { email },
+          {
+            $set: {
+              password: hashedNewPassword,
+              storePassword: storePassword,
+            },
+          }
+        );
 
         res.status(200).json({ message: "Password changed successfully" });
       } catch (error) {
@@ -1963,6 +1961,77 @@ async function run() {
           .json({ message: "No One Can Join The Party! / Server Error" });
       }
     });
+
+    //get all quiz results
+    app.get("/quizzes-results", async (req, res) => {
+      try {
+        // Fetch all quizzes
+        const quizzes = await database.collection("quizzes").find({}).toArray();
+    
+        if (!quizzes.length) {
+          return res.status(404).json({ message: "No quizzes found" });
+        }
+    
+        // Extract all userIds from all quizzes
+        const userIds = quizzes.flatMap((quiz) =>
+          quiz.userAnswers.map((answer) => answer.userId)
+        );
+        const uniqueUserIds = [...new Set(userIds)];
+    
+        // Fetch all users
+        const users = await database
+          .collection("users")
+          .find({ uniqueId: { $in: uniqueUserIds } })
+          .toArray();
+    
+        // Create a map of userId to user object
+        const userMap = users.reduce((map, user) => {
+          map[user.uniqueId] = user;
+          return map;
+        }, {});
+    
+        // Initialize a map to store results for each user
+        const userResults = {};
+    
+        quizzes.forEach((quiz) => {
+          quiz.userAnswers.forEach((answer) => {
+            const userId = answer.userId;
+            const totalMarks = answer.answers.reduce(
+              (sum, ans) => sum + (ans.mark || 0),
+              0
+            );
+            const answerTime = answer.answerTime || 0; // Ensure this is pulled from userAnswers
+    
+            if (!userResults[userId]) {
+              userResults[userId] = {
+                name: userMap[userId]
+                  ? userMap[userId].firstName + " " + userMap[userId].lastName
+                  : "Unknown",
+                image: userMap[userId] ? userMap[userId].image : null,
+                totalMarks: 0,
+                totalAnswerTime: 0, // Initialize totalAnswerTime
+                quizzesAttended: 0,
+              };
+            }
+    
+            userResults[userId].totalMarks += totalMarks;
+            userResults[userId].totalAnswerTime += answerTime; // Accumulate answerTime from userAnswers
+            userResults[userId].quizzesAttended += 1;
+          });
+        });
+    
+        // Convert userResults object to an array
+        const results = Object.values(userResults);
+    
+        res.status(200).json(results);
+      } catch (error) {
+        console.error("Error retrieving quizzes results:", error);
+        res
+          .status(500)
+          .json({ message: "No One Can Join The Party! / Server Error" });
+      }
+    });
+    
 
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
