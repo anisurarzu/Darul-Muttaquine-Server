@@ -1008,21 +1008,50 @@ async function run() {
     app.put("/quiz-money/:userID/status", verifyAuthToken, async (req, res) => {
       try {
         const { userID } = req.params;
-        const { status } = req.body;
+        const { status, amount } = req.body;
 
         console.log("Updating status for userID:", userID); // Debug log
         console.log("New status:", status); // Debug log
+        console.log("Requested amount:", amount); // Debug log
 
-        // Update the status of the user's quiz money entry in the database
-        const result = await database
+        // Get all deposits for the user
+        const userDeposits = await database
           .collection("quiz-deposit")
-          .updateOne({ userID: userID }, { $set: { status: status } });
+          .find({ userID: userID })
+          .toArray();
+
+        if (userDeposits.length === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Sum the total deposit amount
+        const totalDepositAmount = userDeposits.reduce(
+          (acc, deposit) => Number(acc) + Number(deposit.amount),
+          0
+        );
+
+        console.log("Total Deposit Amount:", totalDepositAmount); // Debug log
+
+        // Check if the user has enough balance
+        if (amount > totalDepositAmount) {
+          return res
+            .status(400)
+            .json({ message: "Insufficient balance for the requested amount" });
+        }
+
+        // Update the status only if there is sufficient balance
+        const result = await database.collection("quiz-deposit").updateOne(
+          { userID: userID }, // Match the user
+          { $set: { status: status } }
+        );
 
         // Check if the document was found and updated
         if (result.matchedCount > 0) {
           res.status(200).json({ message: "Status updated successfully" });
         } else {
-          res.status(404).json({ message: "User not found" });
+          res
+            .status(404)
+            .json({ message: "User not found or no matching deposit record" });
         }
       } catch (error) {
         console.error("Error updating status:", error);
@@ -1967,32 +1996,32 @@ async function run() {
       try {
         // Fetch all quizzes
         const quizzes = await database.collection("quizzes").find({}).toArray();
-    
+
         if (!quizzes.length) {
           return res.status(404).json({ message: "No quizzes found" });
         }
-    
+
         // Extract all userIds from all quizzes
         const userIds = quizzes.flatMap((quiz) =>
           quiz.userAnswers.map((answer) => answer.userId)
         );
         const uniqueUserIds = [...new Set(userIds)];
-    
+
         // Fetch all users
         const users = await database
           .collection("users")
           .find({ uniqueId: { $in: uniqueUserIds } })
           .toArray();
-    
+
         // Create a map of userId to user object
         const userMap = users.reduce((map, user) => {
           map[user.uniqueId] = user;
           return map;
         }, {});
-    
+
         // Initialize a map to store results for each user
         const userResults = {};
-    
+
         quizzes.forEach((quiz) => {
           quiz.userAnswers.forEach((answer) => {
             const userId = answer.userId;
@@ -2001,7 +2030,7 @@ async function run() {
               0
             );
             const answerTime = answer.answerTime || 0; // Ensure this is pulled from userAnswers
-    
+
             if (!userResults[userId]) {
               userResults[userId] = {
                 name: userMap[userId]
@@ -2013,16 +2042,16 @@ async function run() {
                 quizzesAttended: 0,
               };
             }
-    
+
             userResults[userId].totalMarks += totalMarks;
             userResults[userId].totalAnswerTime += answerTime; // Accumulate answerTime from userAnswers
             userResults[userId].quizzesAttended += 1;
           });
         });
-    
+
         // Convert userResults object to an array
         const results = Object.values(userResults);
-    
+
         res.status(200).json(results);
       } catch (error) {
         console.error("Error retrieving quizzes results:", error);
@@ -2031,7 +2060,6 @@ async function run() {
           .json({ message: "No One Can Join The Party! / Server Error" });
       }
     });
-    
 
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
