@@ -1565,6 +1565,7 @@ async function run() {
           gender,
           presentAddress,
           bloodGroup,
+          isSmsSend,
         } = req.body;
 
         // Update the information in the database
@@ -1582,6 +1583,7 @@ async function run() {
               gender,
               presentAddress,
               bloodGroup,
+              isSmsSend,
               updatedAt: new Date(),
             },
           }
@@ -1674,6 +1676,43 @@ async function run() {
         res.status(201).json({ message: "Information submitted successfully" });
       } catch (error) {
         console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    /* add cost file */
+    app.post("/add-cost-file", verifyAuthToken, async (req, res) => {
+      try {
+        const { file, id } = req.body;
+
+        // Check if the deposit exists
+        const cost = await database
+          .collection("costInfo")
+          .findOne({ _id: ObjectId(id) });
+        if (!cost) {
+          return res
+            .status(404)
+            .json({ message: "Deposit History not found!" });
+        }
+
+        // Update the document with the new fields
+        const acceptedDate = new Date();
+        await database.collection("costInfo").updateOne(
+          { _id: ObjectId(id) },
+          {
+            $set: { file, fileAttachedDate: new Date() },
+          }
+        );
+
+        const updatedCost = await database
+          .collection("costInfo")
+          .findOne({ _id: ObjectId(id) });
+
+        res.status(200).json({
+          message: "Status updated successfully",
+          user: updatedCost,
+        });
+      } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Server Error" });
       }
     });
