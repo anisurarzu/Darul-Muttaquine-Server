@@ -778,7 +778,7 @@ async function run() {
     });
 
     /* Amount Deposit Information */
-    app.post("/deposit-info", verifyAuthToken, async (req, res) => {
+    app.post("/deposit-info", async (req, res) => {
       try {
         const {
           amount,
@@ -793,7 +793,7 @@ async function run() {
         } = req.body;
 
         // Check if all required fields are provided
-        if (!amount || !phone || !tnxID) {
+        if (!amount) {
           return res.status(400).json({ message: "All fields are required" });
         }
 
