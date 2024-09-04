@@ -1566,6 +1566,7 @@ async function run() {
           presentAddress,
           bloodGroup,
           isSmsSend,
+          isAttendanceComplete,
         } = req.body;
 
         // Update the information in the database
@@ -1584,6 +1585,7 @@ async function run() {
               presentAddress,
               bloodGroup,
               isSmsSend,
+              isAttendanceComplete,
               updatedAt: new Date(),
             },
           }
