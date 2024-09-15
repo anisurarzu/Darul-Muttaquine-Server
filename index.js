@@ -2102,6 +2102,132 @@ async function run() {
       }
     });
 
+    /* --------------------Order Information------------------ */
+    /* ######################################################### */
+    /* ######################################################### */
+
+    app.post("/order-info", async (req, res) => {
+      try {
+        const {
+          fullName,
+          phoneNumber,
+          address,
+          city,
+          trxId,
+          email,
+          cartDetails,
+          totalAmount,
+        } = req.body;
+        console.log("--", req.body);
+
+        // Generate a unique order number
+        const orderNo = `DMF-SHOP${Math.floor(Math.random() * 100)
+          .toString()
+          .padStart(2, "0")}`;
+
+        // Insert the submitted information into the database
+        const result = await database.collection("orderInfo").insertOne({
+          fullName,
+          phoneNumber,
+          address,
+          city,
+          trxId,
+          email,
+          cartDetails,
+          orderDate: new Date(),
+          totalAmount,
+          orderStatus: "Pending",
+          orderNo, // Include the unique order number
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result.insertedId) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        // Respond with a success message and the generated order number
+        res.status(200).json({
+          message: "Information submitted successfully",
+          orderNo, // Return the order number in the response
+        });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/order-info", async (req, res) => {
+      try {
+        const orders = await database.collection("orderInfo").find().toArray();
+        res.status(200).json(orders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    // Get order by _id
+    app.get("/order-info/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const orderNo = id; // Convert id to ObjectId
+
+        const order = await database
+          .collection("orderInfo")
+          .findOne({ orderNo: orderNo });
+
+        if (!order) {
+          return res.status(404).json({ message: "Order not found" });
+        }
+
+        res.status(200).json(order);
+      } catch (error) {
+        console.error("Error fetching order:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.delete("/order-info/:id", verifyAuthToken, async (req, res) => {
+      try {
+        const orderID = req.params.id;
+        const result = await database
+          .collection("orderInfo")
+          .deleteOne({ _id: new ObjectId(orderID) });
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Order not found" });
+        }
+        res.status(200).json({ message: "Order deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting quiz:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.post("/update-order-status", verifyAuthToken, async (req, res) => {
+      try {
+        const { orderStatus, orderID } = req.body;
+
+        // Update user role
+        await database
+          .collection("orderInfo")
+          .updateOne({ _id: new ObjectId(orderID) }, { $set: { orderStatus } });
+
+        const updatedUser = await database
+          .collection("orderInfo")
+          .findOne({ _id: new ObjectId(orderID) });
+
+        res.status(200).json({
+          message: "Order status updated successfully",
+          user: updatedUser,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
       const token = req.headers.authorization?.split(" ")[1];
