@@ -2115,6 +2115,7 @@ async function run() {
           city,
           trxId,
           email,
+          size,
           cartDetails,
           totalAmount,
         } = req.body;
@@ -2133,6 +2134,7 @@ async function run() {
           city,
           trxId,
           email,
+          size,
           cartDetails,
           orderDate: new Date(),
           totalAmount,
