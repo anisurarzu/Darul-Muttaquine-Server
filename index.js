@@ -2104,7 +2104,6 @@ async function run() {
 
     /* --------------------Order Information------------------ */
     /* ######################################################### */
-    /* ######################################################### */
 
     app.post("/order-info", async (req, res) => {
       try {
@@ -2141,8 +2140,6 @@ async function run() {
           orderStatus: "Pending",
           orderNo, // Include the unique order number
         });
-
-        console.log("Insertion result:", result);
 
         // Check if the insertion was successful
         if (!result.insertedId) {
