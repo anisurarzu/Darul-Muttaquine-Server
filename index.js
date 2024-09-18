@@ -2227,6 +2227,36 @@ async function run() {
       }
     });
 
+    /* ----------------add message from contact page----------------- */
+    app.post("/contact-info", async (req, res) => {
+      try {
+        const contactInfo = req.body;
+
+        // Insert the submitted information into the database
+        const result = await database
+          .collection("contactInfo")
+          .insertOne(contactInfo);
+
+        // Check if the insertion was successful
+        if (!result.insertedId) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        // Respond with a success message and the generated order number
+        res.status(200).json({
+          message: "Information submitted successfully",
+          orderNo, // Return the order number in the response
+        });
+      } catch (error) {
+        console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    /* ------------------#################----------------------- */
+
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
       const token = req.headers.authorization?.split(" ")[1];
