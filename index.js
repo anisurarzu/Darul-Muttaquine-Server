@@ -2237,18 +2237,10 @@ async function run() {
           .collection("contactInfo")
           .insertOne(contactInfo);
 
-        // Check if the insertion was successful
-        if (!result.insertedId) {
-          console.error("Failed to insert information into the database");
-          return res
-            .status(500)
-            .json({ message: "Failed to submit information" });
-        }
-
         // Respond with a success message and the generated order number
         res.status(200).json({
           message: "Information submitted successfully",
-          orderNo, // Return the order number in the response
+          // Return the order number in the response
         });
       } catch (error) {
         console.error("Error submitting information:", error);
