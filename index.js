@@ -1566,6 +1566,7 @@ async function run() {
           presentAddress,
           bloodGroup,
           isSmsSend,
+          isSeatPlaned,
           isAttendanceComplete,
         } = req.body;
 
@@ -1585,6 +1586,7 @@ async function run() {
               presentAddress,
               bloodGroup,
               isSmsSend,
+              isSeatPlaned,
               isAttendanceComplete,
               updatedAt: new Date(),
             },
@@ -2244,6 +2246,18 @@ async function run() {
         });
       } catch (error) {
         console.error("Error submitting information:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.get("/contact-info", async (req, res) => {
+      try {
+        const orders = await database
+          .collection("contactInfo")
+          .find()
+          .toArray();
+        res.status(200).json(orders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
