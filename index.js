@@ -1301,8 +1301,8 @@ async function run() {
         }
 
         // Check if scholarshipRollNumber already exists in resultDetails
-        const exists = scholarship.resultDetails.some(
-          (detail) => detail.scholarshipRollNumber === scholarshipRollNumber
+        const exists = scholarship?.resultDetails?.some(
+          (detail) => detail?.scholarshipRollNumber === scholarshipRollNumber
         );
 
         if (exists) {
@@ -1311,12 +1311,12 @@ async function run() {
             .json({ message: "Result details already added" });
         }
 
-        // Update the resultDetails array
+        // Update the resultDetails array by pushing the resultDetails object
         const result = await database.collection("scholarship").updateOne(
           { scholarshipRollNumber: scholarshipRollNumber },
           {
             $set: { userId: ObjectId(userId) },
-            $push: { resultDetails: { $each: resultDetails } },
+            $push: { resultDetails: resultDetails }, // Remove $each since resultDetails is an object
           }
         );
 
