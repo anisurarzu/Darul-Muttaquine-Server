@@ -2037,8 +2037,11 @@ async function run() {
     //get all quiz results
     app.get("/quizzes-results", async (req, res) => {
       try {
-        // Fetch all quizzes
-        const quizzes = await database.collection("quizzes").find({}).toArray();
+        // Fetch all quizzes that are not closed
+        const quizzes = await database
+          .collection("quizzes")
+          .find({ status: { $ne: "closed" } }) // Filter quizzes where status is not "closed"
+          .toArray();
 
         if (!quizzes.length) {
           return res.status(404).json({ message: "No quizzes found" });
