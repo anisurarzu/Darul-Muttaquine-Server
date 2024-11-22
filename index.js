@@ -2209,6 +2209,169 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    /* Admission Method */
+    app.post("/admissions", async (req, res) => {
+      try {
+        const {
+          fullName,
+          parentName,
+          email,
+          phone,
+          gender,
+          course,
+          instituteName,
+          class: className,
+          dmfID,
+        } = req.body;
+        console.log("--", req.body);
+
+        // Generate a unique ID for the admission record
+        const admissionNo = `ADM-${Math.floor(Math.random() * 100)
+          .toString()
+          .padStart(3, "0")}`;
+
+        // Insert the admission data into the database
+        const result = await database.collection("admissions").insertOne({
+          fullName,
+          parentName,
+          email,
+          phone,
+          gender,
+          course,
+          instituteName,
+          className,
+          dmfID,
+          admissionDate: new Date(),
+          admissionNo, // Include the unique admission number
+        });
+
+        // Check if the insertion was successful
+        if (!result.insertedId) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit information" });
+        }
+
+        // Respond with success message and the generated admission number
+        res.status(200).json({
+          message: "Admission data submitted successfully",
+          admissionNo, // Return the admission number in the response
+        });
+      } catch (error) {
+        console.error("Error submitting admission data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/admissions", async (req, res) => {
+      try {
+        const admissions = await database
+          .collection("admissions")
+          .find()
+          .toArray();
+        res.status(200).json(admissions);
+      } catch (error) {
+        console.error("Error fetching admission data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/admissions/:id", async (req, res) => {
+      try {
+        const { id } = req.params; // ID will be the admission number (admissionNo)
+        const admissionNo = id; // Convert id to admissionNo
+
+        const admission = await database
+          .collection("admissions")
+          .findOne({ admissionNo: admissionNo });
+
+        if (!admission) {
+          return res
+            .status(404)
+            .json({ message: "Admission record not found" });
+        }
+
+        res.status(200).json(admission);
+      } catch (error) {
+        console.error("Error fetching admission data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.put("/admissions/:id", async (req, res) => {
+      try {
+        const { id } = req.params; // ID will be the admission number (admissionNo)
+        const admissionNo = id;
+
+        const {
+          fullName,
+          parentName,
+          email,
+          phone,
+          gender,
+          course,
+          instituteName,
+          class: className,
+          dmfID,
+        } = req.body;
+
+        const result = await database.collection("admissions").updateOne(
+          { admissionNo: admissionNo },
+          {
+            $set: {
+              fullName,
+              parentName,
+              email,
+              phone,
+              gender,
+              course,
+              instituteName,
+              className,
+              dmfID,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res
+            .status(404)
+            .json({ message: "Admission record not found" });
+        }
+
+        res
+          .status(200)
+          .json({ message: "Admission data updated successfully" });
+      } catch (error) {
+        console.error("Error updating admission data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.delete("/admissions/:id", async (req, res) => {
+      try {
+        const { id } = req.params; // ID will be the admission number (admissionNo)
+        const admissionNo = id;
+
+        const result = await database
+          .collection("admissions")
+          .deleteOne({ admissionNo: admissionNo });
+
+        if (result.deletedCount === 0) {
+          return res
+            .status(404)
+            .json({ message: "Admission record not found" });
+        }
+
+        res
+          .status(200)
+          .json({ message: "Admission data deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting admission data:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     app.post("/update-order-status", verifyAuthToken, async (req, res) => {
       try {
         const { orderStatus, orderID } = req.body;
