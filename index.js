@@ -624,6 +624,68 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    /* post method  */
+    app.put("/update-user-progress", async (req, res) => {
+      try {
+        const { memberId, voteType } = req.body;
+
+        // Check if the member exists
+        const user = await database
+          .collection("users")
+          .findOne({ _id: new ObjectId(memberId) });
+
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Ensure 'progress' field is an array (if not, initialize it as an empty array)
+        if (!Array.isArray(user.progress)) {
+          user.progress = []; // Initialize as an empty array if it's not an array
+          // Optionally, update the document to set the 'progress' field as an empty array
+          await database
+            .collection("users")
+            .updateOne(
+              { _id: new ObjectId(memberId) },
+              { $set: { progress: [] } }
+            );
+        }
+
+        // Initialize or update progress entry
+        const progressEntry = {
+          type: voteType, // "positive" or "negative"
+          timestamp: new Date(),
+        };
+
+        // Update the progress array and the counts
+        const updatedUser = await database.collection("users").findOneAndUpdate(
+          { _id: new ObjectId(memberId) },
+          {
+            $push: { progress: progressEntry }, // Add the new progress entry to the progress array
+            $inc: {
+              positiveProgress: voteType === "positive" ? 1 : 0, // Increment positiveProgress if voteType is "positive"
+              negativeProgress: voteType === "negative" ? 1 : 0, // Increment negativeProgress if voteType is "negative"
+            },
+          },
+          { returnDocument: "after" } // Return the updated document
+        );
+
+        // Check if the update was successful
+        if (!updatedUser.value) {
+          return res
+            .status(400)
+            .json({ message: "Failed to update user progress" });
+        }
+
+        // Return the updated user progress
+        res.status(200).json({
+          message: "User progress updated successfully",
+          user: updatedUser.value,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     // Function to generate JWT token
     function generateToken(userId) {
