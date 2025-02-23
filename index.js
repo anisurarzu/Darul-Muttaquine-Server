@@ -1355,7 +1355,7 @@ async function run() {
 
         // Find the scholarship document
         const scholarship = await database
-          .collection("scholarship")
+          .collection("scholarshipNew")
           .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
         if (!scholarship) {
@@ -1374,7 +1374,7 @@ async function run() {
         }
 
         // Update the resultDetails array by pushing the resultDetails object
-        const result = await database.collection("scholarship").updateOne(
+        const result = await database.collection("scholarshipNew").updateOne(
           { scholarshipRollNumber: scholarshipRollNumber },
           {
             $set: { userId: ObjectId(userId) },
@@ -1413,7 +1413,7 @@ async function run() {
 
         // Find the scholarship document by scholarshipRollNumber
         const scholarship = await database
-          .collection("scholarship")
+          .collection("scholarshipNew")
           .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
         // Check if the scholarship document exists
@@ -1430,6 +1430,7 @@ async function run() {
 
     // Submit Information Endpoint
     // Submit Information Endpoint
+
     app.post("/scholarship-info", async (req, res) => {
       try {
         const {
@@ -1446,7 +1447,6 @@ async function run() {
           dateOfBirth,
         } = req.body;
 
-        // Check if all required fields are provided
         if (
           !name ||
           !institute ||
@@ -1459,20 +1459,29 @@ async function run() {
           return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Generate a unique scholarship roll number with "dmf" prefix
-        const scholarshipRollNumber = generateUniqueScholarshipRollNumber();
+        // Fetch the last used scholarship roll number from the scholarshipNew collection
+        const lastEntry = await database
+          .collection("scholarshipNew")
+          .find({ scholarshipRollNumber: { $regex: "^DMS" } }) // Only fetch roll numbers that follow the format
+          .sort({ submittedAt: -1 }) // Sort by the latest entry
+          .limit(1)
+          .toArray();
 
-        // Get the user ID from the token
+        // Generate a new scholarship roll number
+        const scholarshipRollNumber =
+          generateUniqueScholarshipRollNumber(lastEntry);
+
+        // Get user ID from token
         const userId = req.userId;
 
         // Insert the submitted information into the database
-        const result = await database.collection("scholarship").insertOne({
+        const result = await database.collection("scholarshipNew").insertOne({
           userId: ObjectId(userId),
           name,
           parentName,
           instituteClass,
           instituteRollNumber,
-          scholarshipRollNumber, // Assign scholarship roll number directly
+          scholarshipRollNumber,
           institute,
           phone,
           gender,
@@ -1483,11 +1492,7 @@ async function run() {
           submittedAt: new Date(),
         });
 
-        console.log("Insertion result:", result);
-
-        // Check if the insertion was successful
-        if (!result) {
-          console.error("Failed to insert information into the database");
+        if (!result.insertedId) {
           return res
             .status(500)
             .json({ message: "Failed to submit information" });
@@ -1495,7 +1500,7 @@ async function run() {
 
         res.status(201).json({
           message: "Information submitted successfully",
-          scholarshipRollNumber, // Include the scholarship roll number in the response
+          scholarshipRollNumber,
         });
       } catch (error) {
         console.error("Error submitting information:", error);
@@ -1503,15 +1508,25 @@ async function run() {
       }
     });
 
-    // Function to generate unique scholarship roll number with "dmf" prefix
-    function generateUniqueScholarshipRollNumber() {
-      // Generate a random number between 100000 and 999999
-      const randomNumber = Math.floor(100000 + Math.random() * 900000);
+    function generateUniqueScholarshipRollNumber(lastEntry) {
+      const currentYear = new Date().getFullYear();
+      const yearSuffix = currentYear.toString().slice(-2); // Extract last two digits of the year
 
-      // Concatenate "dmf" prefix with the random number
-      const scholarshipRollNumber = "DMF" + randomNumber;
+      let serialNumber = 1; // Default starting serial number
 
-      return scholarshipRollNumber;
+      if (lastEntry.length > 0) {
+        const lastRollNumber = lastEntry[0].scholarshipRollNumber; // Get last roll number
+        const lastYear = lastRollNumber.slice(3, 5); // Extract year from last roll
+
+        if (lastYear === yearSuffix) {
+          serialNumber = parseInt(lastRollNumber.slice(5)) + 1; // Increment serial number
+        }
+      }
+
+      // Format serial number (e.g., 01, 02, 10, 99)
+      const formattedSerial = String(serialNumber).padStart(2, "0");
+
+      return `DMS${yearSuffix}${formattedSerial}`;
     }
 
     /*  // Endpoint to retrieve all submitted information
@@ -1538,7 +1553,10 @@ async function run() {
     app.get("/scholarship-info", verifyAuthToken, async (req, res) => {
       try {
         // Fetch all users from the database
-        const users = await database.collection("scholarship").find().toArray();
+        const users = await database
+          .collection("scholarshipNew")
+          .find()
+          .toArray();
         // Send the list of users in the response
         res.status(200).json(users);
       } catch (error) {
@@ -1559,10 +1577,12 @@ async function run() {
         }
 
         // Query the database for the scholarship information
-        const scholarship = await database.collection("scholarship").findOne({
-          _id: ObjectId(scholarshipId),
-          // userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
-        });
+        const scholarship = await database
+          .collection("scholarshipNew")
+          .findOne({
+            _id: ObjectId(scholarshipId),
+            // userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
+          });
 
         // Check if the scholarship exists
         if (!scholarship) {
@@ -1593,7 +1613,7 @@ async function run() {
 
           // Fetch submitted information for the provided scholarshipRollNumber
           const submittedInfo = await database
-            .collection("scholarship")
+            .collection("scholarshipNew")
             .findOne({ scholarshipRollNumber });
 
           // Check if any data was found
@@ -1633,7 +1653,7 @@ async function run() {
         } = req.body;
 
         // Update the information in the database
-        const result = await database.collection("scholarship").updateOne(
+        const result = await database.collection("scholarshipNew").updateOne(
           { _id: ObjectId(scholarshipId) },
           {
             $set: {
@@ -1673,7 +1693,7 @@ async function run() {
         const scholarshipId = req.params.id;
 
         // Delete the information from the database
-        const result = await database.collection("scholarship").deleteOne({
+        const result = await database.collection("scholarshipNew").deleteOne({
           _id: ObjectId(scholarshipId),
         });
 
@@ -2490,6 +2510,278 @@ async function run() {
       }
     });
     /* ------------------#################----------------------- */
+
+    /* --------------###############--------------- COURSE */
+    app.post("/courses", async (req, res) => {
+      try {
+        const {
+          title,
+          category,
+          description,
+          instructorName,
+          instructorImage,
+          startDate,
+          endDate,
+          duration,
+          availableSeats,
+          batchNumber,
+          qualifications,
+          certifications,
+          image,
+        } = req.body;
+
+        // Check if all required fields are provided
+        if (
+          !title ||
+          !category ||
+          !description ||
+          !instructorName ||
+          !startDate ||
+          !endDate ||
+          !duration ||
+          !availableSeats ||
+          !batchNumber ||
+          !qualifications ||
+          !certifications
+        ) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Insert the submitted information into the database (using MongoDB)
+        const result = await database.collection("courses").insertOne({
+          title,
+          category,
+          description,
+          instructorName,
+          instructorImage,
+          startDate,
+          endDate,
+          duration,
+          availableSeats,
+          batchNumber,
+          qualifications,
+          certifications,
+          image,
+          createdAt: new Date(),
+        });
+
+        console.log("Insertion result:", result);
+
+        // Check if the insertion was successful
+        if (!result) {
+          console.error("Failed to insert information into the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to submit course information" });
+        }
+
+        res.status(200).json({ message: "Course created successfully" });
+      } catch (error) {
+        console.error("Error creating course:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.get("/courses", async (req, res) => {
+      try {
+        const courses = await database.collection("courses").find().toArray();
+        res.status(200).json({ courses });
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.get("/courses/:id", async (req, res) => {
+      try {
+        const course = await database
+          .collection("courses")
+          .findOne({ _id: new ObjectId(req.params.id) });
+
+        if (!course) {
+          return res.status(404).json({ message: "Course not found" });
+        }
+
+        res.status(200).json({ course });
+      } catch (error) {
+        console.error("Error fetching course by ID:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.put("/courses/:id", async (req, res) => {
+      try {
+        const {
+          title,
+          category,
+          description,
+          instructorName,
+          instructorImage,
+          startDate,
+          endDate,
+          duration,
+          availableSeats,
+          batchNumber,
+          qualifications,
+          certifications,
+          image,
+        } = req.body;
+
+        // Check if all required fields are provided
+        if (
+          !title ||
+          !category ||
+          !description ||
+          !instructorName ||
+          !startDate ||
+          !endDate ||
+          !duration ||
+          !availableSeats ||
+          !batchNumber ||
+          !qualifications ||
+          !certifications ||
+          !image ||
+          !instructorImage
+        ) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Update the course information in the database
+        const result = await database.collection("courses").updateOne(
+          { _id: new ObjectId(req.params.id) },
+          {
+            $set: {
+              title,
+              category,
+              description,
+              instructorName,
+              instructorImage,
+              startDate,
+              endDate,
+              duration,
+              availableSeats,
+              batchNumber,
+              qualifications,
+              certifications,
+              image,
+            },
+          }
+        );
+
+        if (!result.modifiedCount) {
+          return res
+            .status(404)
+            .json({ message: "Course not found or no changes made" });
+        }
+
+        res.status(200).json({ message: "Course updated successfully" });
+      } catch (error) {
+        console.error("Error updating course:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.delete("/courses/:id", async (req, res) => {
+      try {
+        const result = await database
+          .collection("courses")
+          .deleteOne({ _id: new ObjectId(req.params.id) });
+
+        if (!result.deletedCount) {
+          return res.status(404).json({ message: "Course not found" });
+        }
+
+        res.status(200).json({ message: "Course deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting course:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Course enrollment endpoint
+    app.post("/enroll", async (req, res) => {
+      try {
+        const {
+          courseId,
+          name,
+          parentsName,
+          lastInstitute,
+          class: studentClass,
+          phone,
+          email,
+          paymentMethod,
+          transactionNumber,
+        } = req.body;
+
+        // Validate input fields
+        if (
+          !courseId ||
+          !name ||
+          !parentsName ||
+          !lastInstitute ||
+          !studentClass ||
+          !phone ||
+          !paymentMethod
+        ) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Check if the course exists
+        const course = await database
+          .collection("courses")
+          .findOne({ _id: new require("mongodb").ObjectId(courseId) });
+        if (!course) {
+          return res.status(404).json({ message: "Course not found" });
+        }
+
+        // Validate payment method and transaction number (if required)
+        if (paymentMethod !== "Cash" && !transactionNumber) {
+          return res.status(400).json({
+            message: "Transaction number is required for non-cash payments",
+          });
+        }
+
+        // Check if there are available seats for the course
+        if (course.availableSeats <= 0) {
+          return res
+            .status(400)
+            .json({ message: "No available seats for this course" });
+        }
+
+        // Prepare the enrollment data
+        const enrollmentData = {
+          name,
+          parentsName,
+          lastInstitute,
+          studentClass,
+          phone,
+          email,
+          paymentMethod,
+          transactionNumber:
+            paymentMethod !== "Cash" ? transactionNumber : null,
+          enrolledAt: new Date(),
+        };
+
+        // Add the enrollment to the course's enrollment list
+        const updateResult = await database.collection("courses").updateOne(
+          { _id: new require("mongodb").ObjectId(courseId) },
+          {
+            $push: { enrollments: enrollmentData }, // Add the student to the enrollments array
+            $inc: { availableSeats: -1 }, // Decrease available seats by 1
+          }
+        );
+
+        if (updateResult.modifiedCount > 0) {
+          return res
+            .status(200)
+            .json({ message: `Successfully enrolled in ${course.title}` });
+        } else {
+          return res
+            .status(500)
+            .json({ message: "Failed to enroll in the course" });
+        }
+      } catch (error) {
+        console.error("Error enrolling in course:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
