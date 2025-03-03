@@ -1445,6 +1445,7 @@ async function run() {
           bloodGroup,
           image,
           dateOfBirth,
+          createdBy,
         } = req.body;
 
         if (
@@ -1490,6 +1491,7 @@ async function run() {
           dateOfBirth,
           image,
           submittedAt: new Date(),
+          createdBy,
         });
 
         if (!result.insertedId) {
@@ -1650,6 +1652,7 @@ async function run() {
           isSmsSend,
           isSeatPlaned,
           isAttendanceComplete,
+          createdBy,
         } = req.body;
 
         // Update the information in the database
@@ -1671,6 +1674,7 @@ async function run() {
               isSeatPlaned,
               isAttendanceComplete,
               updatedAt: new Date(),
+              createdBy,
             },
           }
         );
