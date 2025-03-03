@@ -1653,6 +1653,7 @@ async function run() {
           isSeatPlaned,
           isAttendanceComplete,
           createdBy,
+          updatedBy,
         } = req.body;
 
         // Update the information in the database
@@ -1675,6 +1676,7 @@ async function run() {
               isAttendanceComplete,
               updatedAt: new Date(),
               createdBy,
+              updatedBy
             },
           }
         );
