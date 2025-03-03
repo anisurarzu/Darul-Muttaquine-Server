@@ -1446,6 +1446,7 @@ async function run() {
           image,
           dateOfBirth,
           createdBy,
+          createdByName,
         } = req.body;
 
         if (
@@ -1492,6 +1493,7 @@ async function run() {
           image,
           submittedAt: new Date(),
           createdBy,
+          createdByName,
         });
 
         if (!result.insertedId) {
@@ -1653,7 +1655,9 @@ async function run() {
           isSeatPlaned,
           isAttendanceComplete,
           createdBy,
+          createdByName,
           updatedBy,
+          updatedByName,
         } = req.body;
 
         // Update the information in the database
@@ -1676,7 +1680,9 @@ async function run() {
               isAttendanceComplete,
               updatedAt: new Date(),
               createdBy,
-              updatedBy
+              createdByName,
+              updatedBy,
+              updatedByName,
             },
           }
         );
