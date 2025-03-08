@@ -1568,6 +1568,17 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+    app.get("/scholarship-info-old", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("scholarship").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
 
     // Assuming `database` is your MongoDB database connection
 
