@@ -1408,22 +1408,55 @@ async function run() {
       try {
         const { scholarshipRollNumber } = req.params;
 
-        // Get the user ID from the token (if needed for additional checks)
-        const userId = req.userId;
-
-        // Find the scholarship document by scholarshipRollNumber
+        // Update search count
         const scholarship = await database
           .collection("scholarshipNew")
-          .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+          .findOneAndUpdate(
+            { scholarshipRollNumber: scholarshipRollNumber },
+            {
+              $inc: { searchCount: 1 },
+              $setOnInsert: { searchCount: 1 },
+            },
+            {
+              returnDocument: "after",
+              upsert: false,
+            }
+          );
 
-        // Check if the scholarship document exists
-        if (!scholarship) {
+        if (!scholarship.value) {
           return res.status(404).json({ message: "Scholarship not found" });
         }
 
-        res.status(200).json(scholarship);
+        res.status(200).json(scholarship.value);
       } catch (error) {
         console.error("Error searching for result:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // API to get total search count
+    app.get("/total-searches", async (req, res) => {
+      try {
+        const result = await database
+          .collection("scholarshipNew")
+          .aggregate([
+            {
+              $group: {
+                _id: null,
+                totalSearches: { $sum: "$searchCount" },
+              },
+            },
+          ])
+          .toArray();
+
+        const total = result[0]?.totalSearches || 0;
+
+        res.status(200).json({
+          totalSearches: total,
+          message: `Total searches across all results: ${total}`,
+        });
+      } catch (error) {
+        console.error("Error getting total searches:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
