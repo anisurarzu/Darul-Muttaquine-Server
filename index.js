@@ -1404,65 +1404,86 @@ async function run() {
     });
 
     /* get result */
+    // app.get("/search-result/:scholarshipRollNumber", async (req, res) => {
+    //   try {
+    //     const { scholarshipRollNumber } = req.params;
+
+    //     // Get the user ID from the token (if needed for additional checks)
+    //     const userId = req.userId;
+
+    //     // Find the scholarship document by scholarshipRollNumber
+    //     const scholarship = await database
+    //       .collection("scholarshipNew")
+    //       .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+
+    //     // Check if the scholarship document exists
+    //     if (!scholarship) {
+    //       return res.status(404).json({ message: "Scholarship not found" });
+    //     }
+
+    //     res.status(200).json(scholarship);
+    //   } catch (error) {
+    //     console.error("Error searching for result:", error);
+    //     res.status(500).json({ message: "Server Error" });
+    //   }
+    // });
     app.get("/search-result/:scholarshipRollNumber", async (req, res) => {
       try {
         const { scholarshipRollNumber } = req.params;
+        const collection = database.collection("scholarshipNew");
 
-        // Update search count
-        const scholarship = await database
-          .collection("scholarshipNew")
-          .findOneAndUpdate(
-            { scholarshipRollNumber: scholarshipRollNumber },
-            {
-              $inc: { searchCount: 1 },
-              $setOnInsert: { searchCount: 1 },
-            },
-            {
-              returnDocument: "after",
-              upsert: false,
-            }
-          );
-
-        if (!scholarship.value) {
-          return res.status(404).json({ message: "Scholarship not found" });
+        // 1. Find the document first
+        const doc = await collection.findOne({ scholarshipRollNumber });
+        if (!doc) {
+          return res.status(404).json({ message: "Result not found" });
         }
 
-        res.status(200).json(scholarship.value);
+        // 2. Update the search count
+        await collection.updateOne(
+          { scholarshipRollNumber },
+          { $inc: { searchCount: 1 } }
+        );
+
+        // 3. Get the updated document (optional)
+        const updatedDoc = await collection.findOne({ scholarshipRollNumber });
+
+        res.status(200).json(updatedDoc);
       } catch (error) {
-        console.error("Error searching for result:", error);
-        res.status(500).json({ message: "Server Error" });
+        console.error("Error:", error);
+        res.status(500).json({
+          message: "Server Error",
+          error: error.message,
+        });
       }
     });
+    // Submit Information Endpoint
+    // Submit Information Endpoint
 
-    // API to get total search count
     app.get("/total-searches", async (req, res) => {
       try {
-        const result = await database
-          .collection("scholarshipNew")
-          .aggregate([
-            {
-              $group: {
-                _id: null,
-                totalSearches: { $sum: "$searchCount" },
-              },
-            },
-          ])
-          .toArray();
+        const collection = database.collection("scholarshipNew");
+        const count = await collection.countDocuments();
 
-        const total = result[0]?.totalSearches || 0;
+        // Alternative approach if aggregation fails
+        const allDocs = await collection.find({}).toArray();
+        const total = allDocs.reduce(
+          (sum, doc) => sum + (doc.searchCount || 0),
+          0
+        );
 
         res.status(200).json({
           totalSearches: total,
-          message: `Total searches across all results: ${total}`,
+          documentCount: count,
+          message: `Total searches calculated from ${count} documents`,
         });
       } catch (error) {
-        console.error("Error getting total searches:", error);
-        res.status(500).json({ message: "Server Error" });
+        console.error("Error:", error);
+        res.status(500).json({
+          message: "Server Error",
+          error: error.message,
+        });
       }
     });
-
-    // Submit Information Endpoint
-    // Submit Information Endpoint
 
     app.post("/scholarship-info", async (req, res) => {
       try {
