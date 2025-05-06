@@ -537,8 +537,10 @@ async function run() {
           permanentAddress,
           birthDate,
           profession,
+          nidInfo,
+          photoInfo,
+          isVerification,
         } = req.body;
-        // Extract email from verified token
 
         console.log("email", email);
 
@@ -550,16 +552,7 @@ async function run() {
           return res.status(404).json({ message: "User not found" });
         }
 
-        // Generate unique ID if it doesn't exist
-        // if (!user.uniqueId) {
-        //   const uniqueId = await generateUniqueId();
-        //   user.uniqueId = uniqueId;
-        //   await database
-        //     .collection("users")
-        //     .updateOne({ email: email }, { $set: { uniqueId } });
-        // }
-
-        // Update existing user details
+        // Update existing user details including documents and verification
         const updatedData = {
           ...(firstName && { firstName }),
           ...(lastName && { lastName }),
@@ -573,6 +566,9 @@ async function run() {
           ...(permanentAddress && { permanentAddress }),
           ...(birthDate && { birthDate }),
           ...(profession && { profession }),
+          ...(typeof isVerification !== "undefined" && { isVerification }), // Ensure isVerification is included regardless of its value
+          ...(nidInfo && { nidInfo }),
+          ...(photoInfo && { photoInfo }),
         };
 
         await database
