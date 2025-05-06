@@ -521,6 +521,7 @@ async function run() {
       return `DMF-${randomNumber}`;
     };
     // Update the /update-user endpoint in your server code
+    // update some new field
 
     app.post("/update-user", verifyAuthToken, async (req, res) => {
       try {
@@ -754,6 +755,7 @@ async function run() {
         }
 
         // Fetch user information from the database
+
         const user = await database
           .collection("users")
           .findOne({ _id: ObjectId(userId) });
