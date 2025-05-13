@@ -478,22 +478,47 @@ async function run() {
         // Find user by email
         const user = await database.collection("users").findOne({ email });
         if (!user) {
-          return res.status(401).json({ message: "Wrong Email" });
+          return res.status(401).json({
+            success: false,
+            message: "ভুল ইমেইল", // Wrong Email in Bengali
+            field: "email",
+          });
         }
 
         // Compare passwords
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) {
-          return res.status(401).json({ message: "Wrong Password" });
+          return res.status(401).json({
+            success: false,
+            message: "ভুল পাসওয়ার্ড", // Wrong Password in Bengali
+            field: "password",
+          });
+        }
+
+        // Check if account is verified
+        if (!user.isVerification) {
+          return res.status(403).json({
+            success: false,
+            message: "আপনার অ্যাকাউন্ট ভেরিফাই করা হয়নি। ইমেইল চেক করুন।",
+            isVerification: false,
+          });
         }
 
         // Generate JWT token
         const token = generateToken(user._id);
 
-        res.status(200).json({ token });
+        res.status(200).json({
+          success: true,
+          token,
+          isVerification: user.isVerification,
+          message: "সফলভাবে লগইন হয়েছে!", // Login successful in Bengali
+        });
       } catch (error) {
         console.error(error);
-        res.status(500).json({ message: "Server Error" });
+        res.status(500).json({
+          success: false,
+          message: "সার্ভার ত্রুটি", // Server error in Bengali
+        });
       }
     });
 
