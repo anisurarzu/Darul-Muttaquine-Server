@@ -2135,11 +2135,23 @@ async function run() {
 
     app.post("/quizzes-answer", async (req, res) => {
       try {
-        const { quizID, userId, answers, isSubmitted, answerTime } = req.body;
+        const {
+          quizID,
+          userId,
+          userName,
+          userPhone,
+          userEmail,
+          answers,
+          isSubmitted,
+          answerTime,
+        } = req.body;
 
         const userAnswer = {
           quizID,
           userId,
+          userName,
+          userPhone,
+          userEmail,
           answers,
           isSubmitted,
           answerTime,
@@ -2169,7 +2181,6 @@ async function run() {
           return res.status(400).json({ message: "Invalid quizID format" });
         }
 
-        console.log("Received quizID:", quizID);
         const quiz = await database
           .collection("quizzes")
           .findOne({ _id: new ObjectId(quizID) });
@@ -2179,14 +2190,10 @@ async function run() {
         }
 
         const userIds = quiz.userAnswers.map((answer) => answer.userId);
-        console.log("User IDs from userAnswers:", userIds);
-
         const users = await database
           .collection("users")
           .find({ uniqueId: { $in: userIds } })
           .toArray();
-
-        console.log("Fetched users:", users);
 
         const results = quiz.userAnswers
           .map((answer) => {
@@ -2197,23 +2204,31 @@ async function run() {
             );
             const answerTime = answer?.answerTime;
 
-            return user
-              ? {
-                  name: user.firstName + " " + user.lastName,
-                  image: user.image,
-                  totalMarks: totalMarks,
-                  answerTime: answerTime,
-                }
-              : null;
+            // Determine if it's a public user
+            const isPublicUser = !user;
+
+            return {
+              userId: answer.userId, // Include userId in response
+              name: isPublicUser
+                ? answer.userName || "Anonymous"
+                : user.firstName + " " + user.lastName,
+              image: user?.image || null,
+              userPhone: isPublicUser
+                ? answer.userPhone || null
+                : user.phone || null,
+              userEmail: isPublicUser
+                ? answer.userEmail || null
+                : user.email || null,
+              totalMarks: totalMarks,
+              answerTime: answerTime,
+            };
           })
           .filter((result) => result !== null);
 
         res.status(200).json(results);
       } catch (error) {
         console.error("Error retrieving quiz results:", error);
-        res
-          .status(500)
-          .json({ message: "No One Can Join The Party! / Server Error" });
+        res.status(500).json({ message: "Server Error" });
       }
     });
 
@@ -2287,6 +2302,24 @@ async function run() {
         res
           .status(500)
           .json({ message: "No One Can Join The Party! / Server Error" });
+      }
+    });
+
+    // Add this endpoint to your backend
+    app.get("/quizzes/:quizId/check-phone", async (req, res) => {
+      try {
+        const { quizId } = req.params;
+        const { phone } = req.query;
+
+        const quiz = await database.collection("quizzes").findOne({
+          _id: new ObjectId(quizId),
+          "userAnswers.userPhone": phone,
+        });
+
+        res.status(200).json({ exists: !!quiz });
+      } catch (error) {
+        console.error("Error checking phone in quiz:", error);
+        res.status(500).json({ message: "Error checking phone number" });
       }
     });
 
