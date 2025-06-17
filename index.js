@@ -1689,41 +1689,6 @@ async function run() {
       }
     });
     // get data by scholarship roll
-    app.get(
-      "/scholarship-roll-info/:scholarshipRollNumber",
-      verifyAuthToken,
-      async (req, res) => {
-        try {
-          // Extract scholarshipRollNumber from request parameters
-          const { scholarshipRollNumber } = req.params;
-
-          // Validate scholarshipRollNumber parameter
-          if (!scholarshipRollNumber) {
-            return res
-              .status(400)
-              .json({ message: "Scholarship Roll Number is required" });
-          }
-
-          // Fetch submitted information for the provided scholarshipRollNumber
-          const submittedInfo = await database
-            .collection("scholarshipNew")
-            .findOne({ scholarshipRollNumber });
-
-          // Check if any data was found
-          if (!submittedInfo) {
-            return res.status(404).json({
-              message: "No data found for the provided scholarship roll number",
-            });
-          }
-
-          // Send the data back as JSON response
-          res.status(200).json(submittedInfo);
-        } catch (error) {
-          console.error(error);
-          res.status(500).json({ message: "Server Error" });
-        }
-      }
-    );
 
     // Update Information Endpoint
     app.put("/scholarship-info/:id", async (req, res) => {
@@ -1866,6 +1831,41 @@ async function run() {
         res.status(500).json({ message: "Server Error" });
       }
     });
+
+    /* scholarship cost information */
+    app.post("/scholarship-cost-info", async (req, res) => {
+      try {
+        const { scholarshipID, amount, paymentMethod, fundName } = req.body;
+
+        // Basic validation
+        if (!scholarshipID || !amount || !paymentMethod || !fundName) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Insert into DB
+        const result = await database
+          .collection("scholarshipCostInfo")
+          .insertOne({
+            scholarshipID,
+            amount,
+            paymentMethod,
+            fundName,
+            requestDate: new Date(),
+          });
+
+        if (!result.acknowledged) {
+          return res.status(500).json({ message: "Failed to insert data" });
+        }
+
+        res
+          .status(201)
+          .json({ message: "Scholarship cost info submitted successfully" });
+      } catch (error) {
+        console.error("Error inserting scholarship cost info:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     /* add cost file */
     app.post("/add-cost-file", verifyAuthToken, async (req, res) => {
       try {
