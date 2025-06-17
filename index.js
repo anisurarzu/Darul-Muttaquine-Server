@@ -1832,17 +1832,102 @@ async function run() {
       }
     });
 
-    /* scholarship cost information */
-    app.post("/scholarship-cost-info", async (req, res) => {
+    app.post("/cost-info-2", async (req, res) => {
       try {
-        const { scholarshipID, amount, paymentMethod, fundName } = req.body;
+        const {
+          scholarshipID,
+          amount,
+          paymentMethod,
+          fundName,
+          currentBalance,
+          description,
+          status,
+          phone,
+        } = req.body;
 
-        // Basic validation
-        if (!scholarshipID || !amount || !paymentMethod || !fundName) {
+        // Validate required fields
+        if (
+          !scholarshipID ||
+          !amount ||
+          !paymentMethod ||
+          !fundName ||
+          currentBalance === undefined
+        ) {
           return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Insert into DB
+        // Step 1: Insert into costInfo
+        const costResult = await database.collection("costInfo").insertOne({
+          amount,
+          userName: "Scholarship System",
+          userID: scholarshipID,
+          invoice: "",
+          dmfID: scholarshipID,
+          paymentMethod,
+          project: "Scholarship 2025 Ceremony",
+          description: description || "Scholarship fund expense",
+          status: status || "pending",
+          phone: phone || "",
+          reason: "Scholarship Fund",
+          requestDate: new Date(),
+        });
+
+        if (!costResult.acknowledged) {
+          return res
+            .status(500)
+            .json({ message: "Failed to insert cost info" });
+        }
+
+        // Step 2: Insert into scholarshipCostInfo
+        const scholarshipResult = await database
+          .collection("scholarshipCostInfo")
+          .insertOne({
+            scholarshipID,
+            amount,
+            paymentMethod,
+            fundName,
+            currentBalance,
+            requestDate: new Date(),
+          });
+
+        if (!scholarshipResult.acknowledged) {
+          return res
+            .status(500)
+            .json({ message: "Cost inserted, but scholarship cost failed" });
+        }
+
+        res.status(200).json({
+          message: "Cost and scholarship cost info submitted successfully",
+        });
+      } catch (error) {
+        console.error("Error submitting info:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    /* scholarship cost information */
+
+    // Create (already exists)
+    app.post("/scholarship-cost-info", async (req, res) => {
+      try {
+        const {
+          scholarshipID,
+          amount,
+          paymentMethod,
+          fundName,
+          currentBalance,
+        } = req.body;
+
+        if (
+          !scholarshipID ||
+          !amount ||
+          !paymentMethod ||
+          !fundName ||
+          currentBalance === undefined
+        ) {
+          return res.status(400).json({ message: "All fields are required" });
+        }
+
         const result = await database
           .collection("scholarshipCostInfo")
           .insertOne({
@@ -1850,6 +1935,7 @@ async function run() {
             amount,
             paymentMethod,
             fundName,
+            currentBalance,
             requestDate: new Date(),
           });
 
@@ -1862,6 +1948,96 @@ async function run() {
           .json({ message: "Scholarship cost info submitted successfully" });
       } catch (error) {
         console.error("Error inserting scholarship cost info:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    app.patch("/scholarship-cost-info/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!status) {
+          return res.status(400).json({ message: "Status is required" });
+        }
+
+        const result = await database
+          .collection("scholarshipCostInfo")
+          .updateOne({ _id: new ObjectId(id) }, { $set: { status } });
+
+        if (result.modifiedCount === 0) {
+          return res
+            .status(404)
+            .json({ message: "Update failed or no record found" });
+        }
+
+        res.status(200).json({ message: "Status updated successfully" });
+      } catch (error) {
+        console.error("Update error:", error);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
+    // ✅ GET all cost info
+    app.get("/scholarship-cost-info", async (req, res) => {
+      try {
+        const result = await database
+          .collection("scholarshipCostInfo")
+          .find({})
+          .toArray();
+        res.status(200).json(result);
+      } catch (error) {
+        console.error("Error fetching cost info:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // ✅ GET by scholarshipRollNumber
+    app.get("/scholarship-cost-info/:scholarshipID", async (req, res) => {
+      try {
+        const { scholarshipID } = req.params;
+
+        if (!scholarshipID) {
+          return res
+            .status(400)
+            .json({ message: "Scholarship ID is required" });
+        }
+
+        const result = await database
+          .collection("scholarshipCostInfo")
+          .find({ scholarshipID })
+          .toArray();
+
+        if (result.length === 0) {
+          return res
+            .status(404)
+            .json({ message: "No cost info found for this scholarship ID" });
+        }
+
+        res.status(200).json(result);
+      } catch (error) {
+        console.error("Error fetching data by scholarshipID:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // ✅ DELETE cost info by _id
+    app.delete("/scholarship-cost-info/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const result = await database
+          .collection("scholarshipCostInfo")
+          .deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "No data found to delete" });
+        }
+
+        res
+          .status(200)
+          .json({ message: "Scholarship cost info deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting scholarship cost info:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
