@@ -1368,7 +1368,7 @@ async function run() {
         const { scholarshipRollNumber, resultDetails } = req.body;
 
         // Check if all required fields are provided
-        if (!scholarshipRollNumber) {
+        if (!scholarshipRollNumber || !resultDetails) {
           return res.status(400).json({
             message: "scholarshipRollNumber and resultDetails are required",
           });
@@ -1386,27 +1386,39 @@ async function run() {
           return res.status(404).json({ message: "Scholarship not found" });
         }
 
-        // Check if scholarshipRollNumber already exists in resultDetails
-        const exists = scholarship?.resultDetails?.some(
-          (detail) => detail?.scholarshipRollNumber === scholarshipRollNumber
-        );
+        // Check if result already exists for this roll number
+        const existingResultIndex =
+          scholarship.resultDetails?.findIndex(
+            (detail) => detail.scholarshipRollNumber === scholarshipRollNumber
+          ) ?? -1;
 
-        if (exists) {
-          return res
-            .status(409)
-            .json({ message: "Result details already added" });
+        let updateOperation;
+        let message = "Result details added successfully";
+
+        if (existingResultIndex >= 0) {
+          // Update existing result
+          updateOperation = {
+            $set: {
+              userId: ObjectId(userId),
+              [`resultDetails.${existingResultIndex}`]: resultDetails,
+            },
+          };
+          message = "Result details updated successfully (previously existed)";
+        } else {
+          // Add new result
+          updateOperation = {
+            $set: { userId: ObjectId(userId) },
+            $push: { resultDetails: resultDetails },
+          };
         }
 
-        // Update the resultDetails array by pushing the resultDetails object
-        const result = await database.collection("scholarshipNew").updateOne(
-          { scholarshipRollNumber: scholarshipRollNumber },
-          {
-            $set: { userId: ObjectId(userId) },
-            $push: { resultDetails: resultDetails }, // Remove $each since resultDetails is an object
-          }
-        );
-
-        console.log("Update result:", result);
+        // Perform the update
+        const result = await database
+          .collection("scholarshipNew")
+          .updateOne(
+            { scholarshipRollNumber: scholarshipRollNumber },
+            updateOperation
+          );
 
         // Check if the update was successful
         if (result.matchedCount === 0) {
@@ -1417,12 +1429,80 @@ async function run() {
           console.error("Failed to update result details in the database");
           return res
             .status(500)
-            .json({ message: "Failed to add result details" });
+            .json({ message: "Failed to add/update result details" });
         }
 
-        res.status(200).json({ message: "Result details added successfully" });
+        res.status(200).json({ message });
       } catch (error) {
-        console.error("Error adding result details:", error);
+        console.error("Error adding/updating result details:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    app.post("/update-course-fund", async (req, res) => {
+      try {
+        const { scholarshipRollNumber, courseFund } = req.body;
+
+        // Check if required fields are provided
+        if (!scholarshipRollNumber || courseFund === undefined) {
+          return res.status(400).json({
+            message: "scholarshipRollNumber and courseFund are required",
+          });
+        }
+
+        // Get the user ID from the token
+        const userId = req.userId;
+
+        // Find the scholarship document
+        const scholarship = await database
+          .collection("scholarshipNew")
+          .findOne({ scholarshipRollNumber: scholarshipRollNumber });
+
+        if (!scholarship) {
+          return res.status(404).json({ message: "Scholarship not found" });
+        }
+
+        // Find the index of the result details for this roll number
+        const existingResultIndex =
+          scholarship.resultDetails?.findIndex(
+            (detail) => detail.scholarshipRollNumber === scholarshipRollNumber
+          ) ?? -1;
+
+        if (existingResultIndex === -1) {
+          return res.status(404).json({
+            message: "No result details found for this scholarship",
+          });
+        }
+
+        // Update only the courseFund for the specific result
+        const result = await database.collection("scholarshipNew").updateOne(
+          { scholarshipRollNumber: scholarshipRollNumber },
+          {
+            $set: {
+              userId: ObjectId(userId),
+              [`resultDetails.${existingResultIndex}.courseFund`]: courseFund,
+            },
+          }
+        );
+
+        // Check if the update was successful
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Scholarship not found" });
+        }
+
+        if (result.modifiedCount === 0) {
+          console.error("Failed to update course fund in the database");
+          return res
+            .status(500)
+            .json({ message: "Failed to update course fund" });
+        }
+
+        res.status(200).json({
+          message: "Course fund updated successfully",
+          updatedCourseFund: courseFund,
+        });
+      } catch (error) {
+        console.error("Error updating course fund:", error);
         res.status(500).json({ message: "Server Error" });
       }
     });
@@ -3013,8 +3093,9 @@ async function run() {
           name,
           parentsName,
           lastInstitute,
-          class: studentClass,
-          phone,
+          studentClass,
+          scholarshipRollNumber,
+          phone, // Using phone as roll number
           email,
           paymentMethod,
           transactionNumber,
@@ -3024,9 +3105,9 @@ async function run() {
         if (
           !courseId ||
           !name ||
-          !parentsName ||
           !lastInstitute ||
           !studentClass ||
+          !scholarshipRollNumber ||
           !phone ||
           !paymentMethod
         ) {
@@ -3041,51 +3122,69 @@ async function run() {
           return res.status(404).json({ message: "Course not found" });
         }
 
-        // Validate payment method and transaction number (if required)
-        if (paymentMethod !== "Cash" && !transactionNumber) {
+        // Check if student is already enrolled in this course
+        const isAlreadyEnrolled = course.enrollments?.some(
+          (enrollment) => enrollment.phone === phone
+        );
+
+        if (isAlreadyEnrolled) {
           return res.status(400).json({
-            message: "Transaction number is required for non-cash payments",
+            message: "This student is already enrolled in this course",
           });
         }
 
-        // Check if there are available seats for the course
+        // Check available seats
         if (course.availableSeats <= 0) {
           return res
             .status(400)
             .json({ message: "No available seats for this course" });
         }
 
-        // Prepare the enrollment data
+        // Handle scholarship coupon transaction number
+        let newTransactionNumber;
+        if (paymentMethod === "ScholarshipCoupon") {
+          newTransactionNumber = "ScholarshipCoupon";
+        } else {
+          newTransactionNumber = transactionNumber;
+        }
+
+        // Validate transaction number for non-cash payments
+        if (paymentMethod !== "Cash" && !newTransactionNumber) {
+          return res.status(400).json({
+            message: "Transaction number is required for non-cash payments",
+          });
+        }
+
+        // Prepare enrollment data
         const enrollmentData = {
           name,
           parentsName,
           lastInstitute,
-          studentClass,
+          class: studentClass,
           phone,
           email,
           paymentMethod,
-          transactionNumber:
-            paymentMethod !== "Cash" ? transactionNumber : null,
+          transactionNumber: newTransactionNumber,
           enrolledAt: new Date(),
         };
 
-        // Add the enrollment to the course's enrollment list
+        // Update course with new enrollment
         const updateResult = await database.collection("courses").updateOne(
           { _id: new require("mongodb").ObjectId(courseId) },
           {
-            $push: { enrollments: enrollmentData }, // Add the student to the enrollments array
-            $inc: { availableSeats: -1 }, // Decrease available seats by 1
+            $push: { enrollments: enrollmentData },
+            $inc: { availableSeats: -1 },
           }
         );
 
         if (updateResult.modifiedCount > 0) {
-          return res
-            .status(200)
-            .json({ message: `Successfully enrolled in ${course.title}` });
+          return res.status(200).json({
+            message: `Successfully enrolled in ${course.title}`,
+          });
         } else {
-          return res
-            .status(500)
-            .json({ message: "Failed to enroll in the course" });
+          return res.status(500).json({
+            message: "Failed to enroll in the course",
+          });
         }
       } catch (error) {
         console.error("Error enrolling in course:", error);
