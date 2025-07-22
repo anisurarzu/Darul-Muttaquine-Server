@@ -3192,6 +3192,256 @@ async function run() {
       }
     });
 
+    // task management
+
+    // Get All Tasks
+    app.get("/tasks", async (req, res) => {
+      try {
+        const tasks = await database.collection("tasks").find().toArray();
+        res.status(200).json(tasks);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Get Single Task
+    app.get("/tasks/:id", async (req, res) => {
+      try {
+        const task = await database
+          .collection("tasks")
+          .findOne({ _id: new ObjectId(req.params.id) });
+        if (!task) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+        res.status(200).json(task);
+      } catch (error) {
+        console.error("Error fetching task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Update Task
+    app.put("/tasks/:id", async (req, res) => {
+      try {
+        const {
+          title,
+          assignedTo,
+          assignedToName,
+          assignedToImage,
+          notes,
+          dueDate,
+          files,
+          mark,
+          status,
+        } = req.body;
+
+        const updateData = {
+          title,
+          assignedTo,
+          assignedToName,
+          assignedToImage,
+          notes,
+          dueDate,
+          files: files || [],
+          mark: mark || 0,
+          status: status || "pending",
+          updatedAt: new Date(),
+        };
+
+        const result = await database
+          .collection("tasks")
+          .updateOne(
+            { _id: new ObjectId(req.params.id) },
+            { $set: updateData }
+          );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+
+        res.status(200).json({ message: "Task updated successfully" });
+      } catch (error) {
+        console.error("Error updating task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Delete Task
+    app.delete("/tasks/:id", async (req, res) => {
+      try {
+        const result = await database
+          .collection("tasks")
+          .deleteOne({ _id: new ObjectId(req.params.id) });
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+        res.status(200).json({ message: "Task deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Submit Task
+    // Create Task (POST)
+    app.post("/tasks", async (req, res) => {
+      try {
+        const {
+          title,
+          assignedTo,
+          assignedToName,
+          assignedToImage,
+          notes,
+          dueDate,
+          files,
+          mark,
+        } = req.body;
+
+        // Validate required fields
+        if (!title || !assignedTo || !dueDate) {
+          return res
+            .status(400)
+            .json({ message: "Title, assignedTo, and dueDate are required" });
+        }
+
+        const result = await database.collection("tasks").insertOne({
+          title,
+          assignedTo,
+          assignedToName,
+          assignedToImage,
+          notes,
+          dueDate,
+          files: files || [],
+          mark: mark || 0,
+          status: "pending",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        res.status(201).json({
+          message: "Task created successfully",
+          taskId: result.insertedId,
+          task: {
+            _id: result.insertedId,
+            ...req.body,
+            status: "pending",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      } catch (error) {
+        console.error("Error creating task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Submit Task (POST)
+    app.post("/tasks/submit", async (req, res) => {
+      try {
+        const { taskId, comments, files } = req.body;
+
+        // Validate required fields
+        if (!taskId) {
+          return res.status(400).json({ message: "Task ID is required" });
+        }
+
+        const updateData = {
+          status: "completed",
+          submission: {
+            comments: comments || "",
+            files: files || [],
+            submittedAt: new Date(),
+          },
+          updatedAt: new Date(),
+        };
+
+        const result = await database
+          .collection("tasks")
+          .updateOne({ _id: new ObjectId(taskId) }, { $set: updateData });
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+
+        // Return the updated task
+        const updatedTask = await database
+          .collection("tasks")
+          .findOne({ _id: new ObjectId(taskId) });
+
+        res.status(200).json({
+          message: "Task submitted successfully",
+          task: updatedTask,
+        });
+      } catch (error) {
+        console.error("Error submitting task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    // Update Task Mark
+    app.patch("/tasks/:id/mark", async (req, res) => {
+      try {
+        const { mark } = req.body;
+
+        const result = await database
+          .collection("tasks")
+          .updateOne(
+            { _id: new ObjectId(req.params.id) },
+            { $set: { mark, updatedAt: new Date() } }
+          );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+
+        res.status(200).json({ message: "Mark updated successfully" });
+      } catch (error) {
+        console.error("Error updating mark:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Complete Task (PUT)
+    app.put("/tasks/:id/complete", async (req, res) => {
+      try {
+        const result = await database.collection("tasks").updateOne(
+          { _id: new ObjectId(req.params.id) },
+          {
+            $set: {
+              status: "completed",
+              updatedAt: new Date(),
+              completedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+
+        res.status(200).json({ message: "Task completed successfully" });
+      } catch (error) {
+        console.error("Error completing task:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // Get Tasks by User ID (GET)
+    app.get("/tasks/user/:userId", async (req, res) => {
+      try {
+        const tasks = await database
+          .collection("tasks")
+          .find({ assignedTo: req.params.userId })
+          .sort({ dueDate: 1 })
+          .toArray();
+
+        res.status(200).json(tasks);
+      } catch (error) {
+        console.error("Error fetching user tasks:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Middleware function to verify JWT token
     function verifyAuthToken(req, res, next) {
       const token = req.headers.authorization?.split(" ")[1];
