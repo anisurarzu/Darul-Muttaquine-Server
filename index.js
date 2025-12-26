@@ -1741,7 +1741,7 @@ async function run() {
       app.get("/scholarship-info-old-2025", verifyAuthToken, async (req, res) => {
       try {
         // Fetch all users from the database
-        const users = await database.collection("scholarshipV26").find().toArray();
+        const users = await database.collection("scholarshipNew").find().toArray();
         // Send the list of users in the response
         res.status(200).json(users);
       } catch (error) {
