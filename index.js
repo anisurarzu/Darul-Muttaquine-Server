@@ -1379,7 +1379,7 @@ async function run() {
 
         // Find the scholarship document
         const scholarship = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
         if (!scholarship) {
@@ -1414,7 +1414,7 @@ async function run() {
 
         // Perform the update
         const result = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .updateOne(
             { scholarshipRollNumber: scholarshipRollNumber },
             updateOperation
@@ -1455,7 +1455,7 @@ async function run() {
 
         // Find the scholarship document
         const scholarship = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
         if (!scholarship) {
@@ -1475,7 +1475,7 @@ async function run() {
         }
 
         // Update only the courseFund for the specific result
-        const result = await database.collection("scholarshipNew").updateOne(
+        const result = await database.collection("scholarshipV26").updateOne(
           { scholarshipRollNumber: scholarshipRollNumber },
           {
             $set: {
@@ -1517,7 +1517,7 @@ async function run() {
 
     //     // Find the scholarship document by scholarshipRollNumber
     //     const scholarship = await database
-    //       .collection("scholarshipNew")
+    //       .collection("scholarshipV26")
     //       .findOne({ scholarshipRollNumber: scholarshipRollNumber });
 
     //     // Check if the scholarship document exists
@@ -1534,7 +1534,7 @@ async function run() {
     app.get("/search-result/:scholarshipRollNumber", async (req, res) => {
       try {
         const { scholarshipRollNumber } = req.params;
-        const collection = database.collection("scholarshipNew");
+        const collection = database.collection("scholarshipV26");
 
         // 1. Find the document first
         const doc = await collection.findOne({ scholarshipRollNumber });
@@ -1565,7 +1565,7 @@ async function run() {
 
     app.get("/total-searches", async (req, res) => {
       try {
-        const collection = database.collection("scholarshipNew");
+        const collection = database.collection("scholarshipV26");
         const count = await collection.countDocuments();
 
         // Alternative approach if aggregation fails
@@ -1619,9 +1619,9 @@ async function run() {
           return res.status(400).json({ message: "All fields are required" });
         }
 
-        // Fetch the last used scholarship roll number from the scholarshipNew collection
+        // Fetch the last used scholarship roll number from the scholarshipV26 collection
         const lastEntry = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .find({ scholarshipRollNumber: { $regex: "^DMS" } }) // Only fetch roll numbers that follow the format
           .sort({ submittedAt: -1 }) // Sort by the latest entry
           .limit(1)
@@ -1635,7 +1635,7 @@ async function run() {
         const userId = req.userId;
 
         // Insert the submitted information into the database
-        const result = await database.collection("scholarshipNew").insertOne({
+        const result = await database.collection("scholarshipV26").insertOne({
           userId: ObjectId(userId),
           name,
           parentName,
@@ -1716,7 +1716,7 @@ async function run() {
       try {
         // Fetch all users from the database
         const users = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .find()
           .toArray();
         // Send the list of users in the response
@@ -1738,6 +1738,18 @@ async function run() {
       }
     });
 
+      app.get("/scholarship-info-old-2025", verifyAuthToken, async (req, res) => {
+      try {
+        // Fetch all users from the database
+        const users = await database.collection("scholarshipV26").find().toArray();
+        // Send the list of users in the response
+        res.status(200).json(users);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
     // Assuming `database` is your MongoDB database connection
 
     app.get("/scholarship-info/:id", async (req, res) => {
@@ -1751,7 +1763,7 @@ async function run() {
 
         // Query the database for the scholarship information
         const scholarship = await database
-          .collection("scholarshipNew")
+          .collection("scholarshipV26")
           .findOne({
             _id: ObjectId(scholarshipId),
             // userId: ObjectId(req.userId), // Assuming you want to ensure the scholarship belongs to the current user
@@ -1795,7 +1807,7 @@ async function run() {
         } = req.body;
 
         // Update the information in the database
-        const result = await database.collection("scholarshipNew").updateOne(
+        const result = await database.collection("scholarshipV26").updateOne(
           { _id: ObjectId(scholarshipId) },
           {
             $set: {
@@ -1839,7 +1851,7 @@ async function run() {
         const scholarshipId = req.params.id;
 
         // Delete the information from the database
-        const result = await database.collection("scholarshipNew").deleteOne({
+        const result = await database.collection("scholarshipV26").deleteOne({
           _id: ObjectId(scholarshipId),
         });
 
