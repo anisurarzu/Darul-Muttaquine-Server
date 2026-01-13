@@ -207,50 +207,27 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Get active users (based on lastActive timestamp)
+// Get active users (users who are currently online - logged in and not logged out)
 const getActiveUsers = async (req, res) => {
   try {
-    // Default: users active in the last 15 seconds
-    // Can also use ?minutes=X for minutes, or ?seconds=X for seconds
-    const activeSeconds = req.query.seconds 
-      ? parseInt(req.query.seconds) 
-      : req.query.minutes 
-        ? parseInt(req.query.minutes) * 60 
-        : 15; // Default 15 seconds
-    
-    // Calculate the timestamp threshold
-    const threshold = new Date(Date.now() - activeSeconds * 1000);
-    
     const database = getDatabase();
     
-    // First, let's check ALL users with lastActive to see what we have
-    const allUsersWithLastActive = await database
-      .collection("users")
-      .find({
-        lastActive: { $exists: true, $ne: null }
-      })
-      .project({ email: 1, lastActive: 1, isVerification: 1 })
-      .sort({ lastActive: -1 })
-      .toArray();
-    
-    console.log(`\n=== All Users with lastActive ===`);
-    console.log(`Total users with lastActive field: ${allUsersWithLastActive.length}`);
-    allUsersWithLastActive.forEach((user, index) => {
-      const minutesAgo = Math.round((Date.now() - new Date(user.lastActive).getTime()) / 60000);
-      console.log(`  ${index + 1}. ${user.email} - lastActive: ${minutesAgo} minutes ago, verified: ${user.isVerification}`);
-    });
-    console.log(`==================================\n`);
-    
-    // Find active users with MongoDB
-    // Query: users who have lastActive within the threshold (and optionally are verified)
+    // Find all users who are currently online
+    // Users are online if they have lastActive set (meaning they logged in and haven't logged out)
+    // We can also check isOnline field if it exists
     const activeUsers = await database
       .collection("users")
       .find({
-        lastActive: {
-          $exists: true, // Field exists
-          $ne: null,     // Not null
-          $gte: threshold // Within the time threshold
-        }
+        $or: [
+          { isOnline: true },
+          { 
+            lastActive: { 
+              $exists: true, 
+              $ne: null 
+            },
+            isOnline: { $ne: false } // Not explicitly set to false
+          }
+        ]
       })
       .project({
         _id: 1,
@@ -261,26 +238,27 @@ const getActiveUsers = async (req, res) => {
         profession: 1,
         lastActive: 1,
         createdAt: 1,
-        isVerification: 1
+        isVerification: 1,
+        isOnline: 1
         // Note: password, verificationToken, resetToken, resetTokenExpires are excluded by default
         // since we're using inclusion projection
       })
       .sort({ lastActive: -1 }) // Sort by most recently active first
       .toArray();
     
-    // Debug logging - show all users found
-    console.log(`\n=== Active Users Debug ===`);
-    console.log(`Threshold: ${threshold.toISOString()} (${activeSeconds} seconds ago)`);
-    console.log(`Found ${activeUsers.length} users with lastActive field:`);
-    activeUsers.forEach((user, index) => {
-      console.log(`  ${index + 1}. ${user.email} - lastActive: ${user.lastActive?.toISOString() || 'null'}, verified: ${user.isVerification}`);
-    });
-    
-    // Filter to only verified users (optional - remove if you want all active users)
+    // Filter to only verified users
     const verifiedActiveUsers = activeUsers.filter(user => user.isVerification === true);
     
-    console.log(`After verification filter: ${verifiedActiveUsers.length} verified users`);
-    console.log(`==========================\n`);
+    // Debug logging
+    console.log(`\n=== Online Users ===`);
+    console.log(`Found ${activeUsers.length} online users (${verifiedActiveUsers.length} verified)`);
+    verifiedActiveUsers.forEach((user, index) => {
+      const timeAgo = user.lastActive 
+        ? Math.round((Date.now() - new Date(user.lastActive).getTime()) / 1000) + ' seconds ago'
+        : 'unknown';
+      console.log(`  ${index + 1}. ${user.email} - lastActive: ${timeAgo}`);
+    });
+    console.log(`==================\n`);
 
     // Format users with full image URLs
     const users = verifiedActiveUsers.map(user => {
@@ -305,11 +283,10 @@ const getActiveUsers = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Found ${users.length} active user(s)`,
+      message: `Found ${users.length} online user(s)`,
       data: {
         users: users,
-        count: users.length,
-        activeWithinSeconds: activeSeconds
+        count: users.length
       }
     });
   } catch (error) {

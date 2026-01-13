@@ -171,11 +171,11 @@ const login = async (req, res) => {
       });
     }
 
-    // Update lastActive timestamp when user logs in
+    // Update lastActive timestamp and set isOnline when user logs in
     const now = new Date();
     const updateResult = await database.collection("users").updateOne(
       { _id: user._id },
-      { $set: { lastActive: now } }
+      { $set: { lastActive: now, isOnline: true } }
     );
     
     // Log if update failed (for debugging)
@@ -215,11 +215,11 @@ const getUserInfo = async (req, res) => {
 
     const database = getDatabase();
     
-    // Update lastActive timestamp when user fetches their info
+    // Update lastActive timestamp when user fetches their info (keeps them online)
     const now = new Date();
     await database.collection("users").updateOne(
       { _id: ObjectId(userId) },
-      { $set: { lastActive: now } }
+      { $set: { lastActive: now, isOnline: true } }
     );
     
     const user = await database
@@ -236,10 +236,48 @@ const getUserInfo = async (req, res) => {
   }
 };
 
+// Logout
+const logout = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized: Token missing" });
+    }
+
+    const userId = verifyToken(token);
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: Invalid token" });
+    }
+
+    const database = getDatabase();
+    
+    // Clear lastActive and set isOnline to false when user logs out
+    await database.collection("users").updateOne(
+      { _id: ObjectId(userId) },
+      { 
+        $set: { isOnline: false },
+        $unset: { lastActive: "" } // Remove lastActive field
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully"
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server Error" 
+    });
+  }
+};
+
 module.exports = {
   register,
   forgotPassword,
   changePassword,
   login,
   getUserInfo,
+  logout,
 };
