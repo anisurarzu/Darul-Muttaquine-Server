@@ -164,6 +164,33 @@ const getScholarshipById = async (req, res) => {
   }
 };
 
+// Get scholarship by roll number
+const getScholarshipByRollNumber = async (req, res) => {
+  try {
+    const scholarshipRollNumber = req.params.rollNumber;
+    const database = getDatabase();
+
+    if (!scholarshipRollNumber) {
+      return res.status(400).json({ message: "Scholarship roll number is required" });
+    }
+
+    const scholarship = await database
+      .collection("scholarshipV26")
+      .findOne({
+        scholarshipRollNumber: scholarshipRollNumber,
+      });
+
+    if (!scholarship) {
+      return res.status(404).json({ message: "Scholarship not found" });
+    }
+
+    res.status(200).json({ scholarship });
+  } catch (error) {
+    console.error("Error fetching scholarship information:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 // Update scholarship
 const updateScholarship = async (req, res) => {
   try {
@@ -253,6 +280,7 @@ module.exports = {
   getOldScholarships,
   getOld2025Scholarships,
   getScholarshipById,
+  getScholarshipByRollNumber,
   updateScholarship,
   deleteScholarship,
 };

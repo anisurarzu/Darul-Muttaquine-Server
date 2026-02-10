@@ -7,6 +7,7 @@ const {
   getOldScholarships,
   getOld2025Scholarships,
   getScholarshipById,
+  getScholarshipByRollNumber,
   updateScholarship,
   deleteScholarship,
 } = require("../controllers/scholarshipController");
@@ -16,6 +17,7 @@ router.get("/scholarship-info", getAllScholarships); // Public endpoint
 router.get("/scholarship-info-old", verifyAuthToken, getOldScholarships);
 router.get("/scholarship-info-old-2025", verifyAuthToken, getOld2025Scholarships);
 router.get("/scholarship-info/:id", getScholarshipById); // Already public
+router.get("/scholarship-info-roll/:rollNumber", getScholarshipByRollNumber); // Public endpoint
 router.put("/scholarship-info/:id", updateScholarship);
 router.delete("/scholarship-info/:id", deleteScholarship);
 
