@@ -1,10 +1,10 @@
 const { ObjectId } = require("mongodb");
 const { getDatabase } = require("../config/database");
 
-// Add result (Scholarship Roll No + Correct Answer only)
+// Add result (Scholarship Roll No + Correct Answer; optional vibaMarks)
 const addResult = async (req, res) => {
   try {
-    const { scholarshipRollNumber, correctAnswer } = req.body;
+    const { scholarshipRollNumber, correctAnswer, vibaMarks } = req.body;
 
     if (!scholarshipRollNumber || correctAnswer === undefined) {
       return res.status(400).json({
@@ -23,28 +23,29 @@ const addResult = async (req, res) => {
       return res.status(404).json({ message: "Scholarship not found" });
     }
 
+    const updateFields = {
+      userId: ObjectId(userId),
+      correctAnswer,
+      resultUpdatedAt: new Date(),
+    };
+    if (vibaMarks !== undefined) updateFields.vibaMarks = vibaMarks;
+
     const result = await database.collection("scholarshipV26").updateOne(
       { scholarshipRollNumber },
-      {
-        $set: {
-          userId: ObjectId(userId),
-          correctAnswer,
-          resultUpdatedAt: new Date(),
-        },
-      }
+      { $set: updateFields }
     );
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: "Scholarship not found" });
     }
 
+    const data = { scholarshipRollNumber, correctAnswer };
+    if (vibaMarks !== undefined) data.vibaMarks = vibaMarks;
+
     res.status(200).json({
       success: true,
       message: "Result added successfully",
-      data: {
-        scholarshipRollNumber,
-        correctAnswer,
-      },
+      data,
     });
   } catch (error) {
     console.error("Error adding result:", error);
@@ -122,6 +123,7 @@ const deleteResult = async (req, res) => {
         $unset: {
           correctAnswer: "",
           resultUpdatedAt: "",
+          vibaMarks: "",
         },
       }
     );
@@ -516,6 +518,7 @@ function buildInstituteRankedList(all, totalApplications, passThreshold, highMar
     return {
       institute: row.institute,
       applicationCount,
+      totalScholarshipCount: applicationCount,
       presentCount,
       presentPercentOfApplications,
       presentPercentOfOwn,
