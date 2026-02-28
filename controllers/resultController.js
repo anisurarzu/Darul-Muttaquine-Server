@@ -231,6 +231,7 @@ const normalizeClass = (instituteClass) => {
 const getResultStats = async (req, res) => {
   try {
     const database = getDatabase();
+    const config = await getResultCalculationConfig(database);
     const collection = database.collection("scholarshipV26");
 
     const totalApplications = await collection.countDocuments({});
@@ -259,7 +260,7 @@ const getResultStats = async (req, res) => {
 
     const passed = withResult.filter((d) => {
       const m = parseMarks(d.correctAnswer);
-      const { passThreshold } = getPassAnd70Thresholds(d.instituteClass);
+      const { passThreshold } = getThresholdsFromConfig(d.instituteClass, config);
       return m != null && m >= passThreshold;
     });
     const passCount = passed.length;
@@ -274,7 +275,7 @@ const getResultStats = async (req, res) => {
 
     const got70 = withResult.filter((d) => {
       const m = parseMarks(d.correctAnswer);
-      const { got70Threshold } = getPassAnd70Thresholds(d.instituteClass);
+      const { got70Threshold } = getThresholdsFromConfig(d.instituteClass, config);
       return m != null && m >= got70Threshold;
     });
     const got70Count = got70.length;
@@ -287,6 +288,9 @@ const getResultStats = async (req, res) => {
         ? Math.round((got70Count / resultAddedCount) * 10000) / 100
         : 0;
 
+    const GOT75_THRESHOLD_CLASS_3_TO_5 = config.class3To5.totalMarks * (config.class3To5.got75Percent / 100);
+    const GOT75_THRESHOLD_CLASS_6_TO_12 = config.class6To12.totalMarks * (config.class6To12.got75Percent / 100);
+
     const byClassMap = new Map();
 
     for (const d of all) {
@@ -298,6 +302,7 @@ const getResultStats = async (req, res) => {
           resultAddedCount: 0,
           passCount: 0,
           got70Count: 0,
+          got75Count: 0,
         });
       }
       const row = byClassMap.get(cls);
@@ -305,9 +310,10 @@ const getResultStats = async (req, res) => {
       if (d.correctAnswer != null) {
         row.resultAddedCount += 1;
         const m = parseMarks(d.correctAnswer);
-        const { passThreshold, got70Threshold } = getPassAnd70Thresholds(d.instituteClass);
+        const { passThreshold, got70Threshold, got75Threshold } = getThresholdsFromConfig(d.instituteClass, config);
         if (m != null && m >= passThreshold) row.passCount += 1;
         if (m != null && m >= got70Threshold) row.got70Count += 1;
+        if (m != null && m >= got75Threshold) row.got75Count += 1;
       }
     }
 
@@ -316,8 +322,9 @@ const getResultStats = async (req, res) => {
       const resultAddedCount = row.resultAddedCount;
       const passCount = row.passCount;
       const got70Count = row.got70Count;
-      const totalMarks = CLASS_3_TO_5_SET.has(row.class) ? TOTAL_MARKS_CLASS_3_TO_5 : TOTAL_MARKS_OTHERS;
-      return {
+      const got75Count = row.got75Count ?? 0;
+      const totalMarks = CLASS_3_TO_5_SET.has(row.class) ? config.class3To5.totalMarks : config.class6To12.totalMarks;
+      const out = {
         class: row.class,
         totalMarks,
         totalPresent,
@@ -337,6 +344,10 @@ const getResultStats = async (req, res) => {
             ? Math.round((got70Count / totalPresent) * 10000) / 100
             : 0,
       };
+      out.got75Count = got75Count;
+      out.got75RatioPercent =
+        totalPresent > 0 ? Math.round((got75Count / totalPresent) * 10000) / 100 : 0;
+      return out;
     });
 
     byClass.sort((a, b) => {
@@ -345,6 +356,115 @@ const getResultStats = async (req, res) => {
       if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
       return String(a.class).localeCompare(String(b.class));
     });
+
+    const allClass3To5 = all.filter((d) => isClass3To5(d.instituteClass));
+    const presentClass3To5 = allClass3To5.length;
+    const withResultClass3To5 = allClass3To5.filter((d) => d.correctAnswer != null);
+    const resultAddedClass3To5 = withResultClass3To5.length;
+    const got75Class3To5 = withResultClass3To5.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      return m != null && m >= GOT75_THRESHOLD_CLASS_3_TO_5;
+    });
+    const got75CountClass3To5 = got75Class3To5.length;
+    const passCountClass3To5 = withResultClass3To5.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      const { passThreshold } = getThresholdsFromConfig(d.instituteClass, config);
+      return m != null && m >= passThreshold;
+    }).length;
+    const got70CountClass3To5 = withResultClass3To5.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      const { got70Threshold } = getThresholdsFromConfig(d.instituteClass, config);
+      return m != null && m >= got70Threshold;
+    }).length;
+
+    const class3To5 = {
+      totalMarks: config.class3To5.totalMarks,
+      totalPresent: presentClass3To5,
+      resultAddedCount: resultAddedClass3To5,
+      resultAddedRatioPercent:
+        presentClass3To5 > 0
+          ? Math.round((resultAddedClass3To5 / presentClass3To5) * 10000) / 100
+          : 0,
+      passCount: passCountClass3To5,
+      passRatioPercent:
+        presentClass3To5 > 0
+          ? Math.round((passCountClass3To5 / presentClass3To5) * 10000) / 100
+          : 0,
+      got70Count: got70CountClass3To5,
+      got70RatioPercent:
+        presentClass3To5 > 0
+          ? Math.round((got70CountClass3To5 / presentClass3To5) * 10000) / 100
+          : 0,
+      got75Count: got75CountClass3To5,
+      got75RatioPercent:
+        presentClass3To5 > 0
+          ? Math.round((got75CountClass3To5 / presentClass3To5) * 10000) / 100
+          : 0,
+      byClass: byClass.filter((r) => CLASS_3_TO_5_SET.has(r.class)),
+    };
+
+    const allClass6To12 = all.filter((d) => !isClass3To5(d.instituteClass));
+    const presentClass6To12 = allClass6To12.length;
+    const withResultClass6To12 = allClass6To12.filter((d) => d.correctAnswer != null);
+    const resultAddedClass6To12 = withResultClass6To12.length;
+    const got75Class6To12 = withResultClass6To12.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      return m != null && m >= GOT75_THRESHOLD_CLASS_6_TO_12;
+    });
+    const got75CountClass6To12 = got75Class6To12.length;
+    const passCountClass6To12 = withResultClass6To12.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      const { passThreshold } = getThresholdsFromConfig(d.instituteClass, config);
+      return m != null && m >= passThreshold;
+    }).length;
+    const got70CountClass6To12 = withResultClass6To12.filter((d) => {
+      const m = parseMarks(d.correctAnswer);
+      const { got70Threshold } = getThresholdsFromConfig(d.instituteClass, config);
+      return m != null && m >= got70Threshold;
+    }).length;
+
+    const class6To12 = {
+      totalMarks: config.class6To12.totalMarks,
+      totalPresent: presentClass6To12,
+      resultAddedCount: resultAddedClass6To12,
+      resultAddedRatioPercent:
+        presentClass6To12 > 0
+          ? Math.round((resultAddedClass6To12 / presentClass6To12) * 10000) / 100
+          : 0,
+      passCount: passCountClass6To12,
+      passRatioPercent:
+        presentClass6To12 > 0
+          ? Math.round((passCountClass6To12 / presentClass6To12) * 10000) / 100
+          : 0,
+      got70Count: got70CountClass6To12,
+      got70RatioPercent:
+        presentClass6To12 > 0
+          ? Math.round((got70CountClass6To12 / presentClass6To12) * 10000) / 100
+          : 0,
+      got75Count: got75CountClass6To12,
+      got75RatioPercent:
+        presentClass6To12 > 0
+          ? Math.round((got75CountClass6To12 / presentClass6To12) * 10000) / 100
+          : 0,
+      byClass: byClass.filter((r) => !CLASS_3_TO_5_SET.has(r.class)),
+    };
+
+    const byClassForTop5 = new Map();
+    for (const d of withResult) {
+      const cls = normalizeClass(d.instituteClass);
+      const m = parseMarks(d.correctAnswer);
+      if (m == null) continue;
+      if (!byClassForTop5.has(cls)) byClassForTop5.set(cls, []);
+      byClassForTop5.get(cls).push({
+        scholarshipRollNumber: d.scholarshipRollNumber != null ? String(d.scholarshipRollNumber).trim() : null,
+        marks: m,
+      });
+    }
+    const top5ByClass = {};
+    for (const [cls, list] of byClassForTop5) {
+      list.sort((a, b) => b.marks - a.marks);
+      top5ByClass[cls] = list.slice(0, 5);
+    }
 
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
@@ -366,6 +486,9 @@ const getResultStats = async (req, res) => {
           got70RatioAmongResultAddedPercent: got70RatioAmongResult,
         },
         byClass,
+        class3To5,
+        class6To12,
+        top5ByClass,
       },
     });
   } catch (error) {
@@ -437,12 +560,52 @@ const CLASS_3_TO_5_SET = new Set(["3", "4", "5"]);
 const TOTAL_MARKS_CLASS_3_TO_5 = 45;
 const TOTAL_MARKS_OTHERS = 100;
 
+const RESULT_CALCULATION_CONFIG_ID = "default";
+const DEFAULT_RESULT_CALCULATION_CONFIG = {
+  class3To5: {
+    totalMarks: 45,
+    passPercent: 40,
+    highMarksPercent: 70,
+    got75Percent: 75,
+  },
+  class6To12: {
+    totalMarks: 100,
+    passPercent: 40,
+    highMarksPercent: 60,
+    got75Percent: 75,
+  },
+};
+
+async function getResultCalculationConfig(database) {
+  const doc = await database
+    .collection("resultCalculationConfig")
+    .findOne({ _id: RESULT_CALCULATION_CONFIG_ID });
+  if (!doc || !doc.class3To5 || !doc.class6To12) return DEFAULT_RESULT_CALCULATION_CONFIG;
+  return {
+    class3To5: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class3To5, ...doc.class3To5 },
+    class6To12: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class6To12, ...doc.class6To12 },
+  };
+}
+
 function isClass3To5(instituteClass) {
   const c = normalizeClass(instituteClass);
   return CLASS_3_TO_5_SET.has(c);
 }
 
-// Pass = 40% of total marks; 70% = 70% of total. Class 3–5 total = 45, others = 100.
+function getThresholdsFromConfig(instituteClass, config) {
+  const c = isClass3To5(instituteClass) ? config.class3To5 : config.class6To12;
+  const totalMarks = c.totalMarks;
+  const passPercent = typeof c.passPercent === "number" ? c.passPercent : 40;
+  const highMarksPercent = typeof c.highMarksPercent === "number" ? c.highMarksPercent : (isClass3To5(instituteClass) ? 70 : 60);
+  const got75Percent = typeof c.got75Percent === "number" ? c.got75Percent : 75;
+  return {
+    totalMarks,
+    passThreshold: totalMarks * (passPercent / 100),
+    got70Threshold: totalMarks * (highMarksPercent / 100),
+    got75Threshold: totalMarks * (got75Percent / 100),
+  };
+}
+
 function getTotalMarksForClass(instituteClass) {
   return isClass3To5(instituteClass) ? TOTAL_MARKS_CLASS_3_TO_5 : TOTAL_MARKS_OTHERS;
 }
@@ -456,10 +619,10 @@ function getPassAnd70Thresholds(instituteClass) {
 }
 
 // Build institute-wise ranked list from a subset of documents (same logic, reused for Class 3–5 and Others)
-// totalMarksForCategory: 45 for class 3–5, 100 for others. Pass = 40% of total, 70% = 70% of total.
-function buildInstituteRankedList(all, totalApplications, totalMarksForCategory, similarityThreshold) {
-  const passThreshold = totalMarksForCategory * 0.4;
-  const highMarksThreshold = totalMarksForCategory * 0.7;
+// totalMarksForCategory, passPercent, highMarksPercent from config (e.g. 45, 40, 70 for class 3–5).
+function buildInstituteRankedList(all, totalApplications, totalMarksForCategory, passPercent, highMarksPercent, similarityThreshold) {
+  const passThreshold = totalMarksForCategory * (passPercent / 100);
+  const highMarksThreshold = totalMarksForCategory * (highMarksPercent / 100);
   const byInstituteMap = new Map();
 
   for (const d of all) {
@@ -604,6 +767,7 @@ function buildInstituteRankedList(all, totalApplications, totalMarksForCategory,
 const getInstituteWiseStats = async (req, res) => {
   try {
     const database = getDatabase();
+    const config = await getResultCalculationConfig(database);
     const collection = database.collection("scholarshipV26");
     const similarityThreshold = 0.7;
 
@@ -626,13 +790,17 @@ const getInstituteWiseStats = async (req, res) => {
     const institutesClass3To5 = buildInstituteRankedList(
       allClass3To5,
       totalApplicationsClass3To5,
-      TOTAL_MARKS_CLASS_3_TO_5,
+      config.class3To5.totalMarks,
+      config.class3To5.passPercent,
+      config.class3To5.highMarksPercent,
       similarityThreshold
     );
     const institutesOthers = buildInstituteRankedList(
       allOthers,
       totalApplicationsOthers,
-      TOTAL_MARKS_OTHERS,
+      config.class6To12.totalMarks,
+      config.class6To12.passPercent,
+      config.class6To12.highMarksPercent,
       similarityThreshold
     );
 
@@ -645,13 +813,13 @@ const getInstituteWiseStats = async (req, res) => {
       success: true,
       data: {
         class3To5: {
-          totalMarks: TOTAL_MARKS_CLASS_3_TO_5, // 45 — pass 40%, got70 = 70% of 45
+          totalMarks: config.class3To5.totalMarks,
           totalApplications: totalApplicationsClass3To5,
           totalNumberOfInstitutions: institutesClass3To5.length,
           institutes: institutesClass3To5,
         },
         others: {
-          totalMarks: TOTAL_MARKS_OTHERS, // 100 — pass 40%, got70 = 70% of 100
+          totalMarks: config.class6To12.totalMarks,
           totalApplications: totalApplicationsOthers,
           totalNumberOfInstitutions: institutesOthers.length,
           institutes: institutesOthers,
@@ -664,6 +832,58 @@ const getInstituteWiseStats = async (req, res) => {
   }
 };
 
+// Insert or update result calculation config (class 3–5 and 6–12: totalMarks, pass%, highMarks%, got75%)
+const insertResultCalculationConfig = async (req, res) => {
+  try {
+    const { class3To5, class6To12 } = req.body;
+    const database = getDatabase();
+    const coll = database.collection("resultCalculationConfig");
+
+    const doc = {
+      _id: RESULT_CALCULATION_CONFIG_ID,
+      class3To5: {
+        totalMarks: typeof class3To5?.totalMarks === "number" ? class3To5.totalMarks : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.totalMarks,
+        passPercent: typeof class3To5?.passPercent === "number" ? class3To5.passPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.passPercent,
+        highMarksPercent: typeof class3To5?.highMarksPercent === "number" ? class3To5.highMarksPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.highMarksPercent,
+        got75Percent: typeof class3To5?.got75Percent === "number" ? class3To5.got75Percent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.got75Percent,
+      },
+      class6To12: {
+        totalMarks: typeof class6To12?.totalMarks === "number" ? class6To12.totalMarks : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.totalMarks,
+        passPercent: typeof class6To12?.passPercent === "number" ? class6To12.passPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.passPercent,
+        highMarksPercent: typeof class6To12?.highMarksPercent === "number" ? class6To12.highMarksPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.highMarksPercent,
+        got75Percent: typeof class6To12?.got75Percent === "number" ? class6To12.got75Percent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.got75Percent,
+      },
+      updatedAt: new Date(),
+    };
+
+    await coll.updateOne(
+      { _id: RESULT_CALCULATION_CONFIG_ID },
+      { $set: doc },
+      { upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Result calculation config saved",
+      data: { class3To5: doc.class3To5, class6To12: doc.class6To12 },
+    });
+  } catch (error) {
+    console.error("Error saving result calculation config:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+const getResultCalculationConfigApi = async (req, res) => {
+  try {
+    const database = getDatabase();
+    const config = await getResultCalculationConfig(database);
+    res.status(200).json({ success: true, data: config });
+  } catch (error) {
+    console.error("Error getting result calculation config:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 module.exports = {
   addResult,
   updateCourseFund,
@@ -672,4 +892,6 @@ module.exports = {
   getTotalSearches,
   getResultStats,
   getInstituteWiseStats,
+  insertResultCalculationConfig,
+  getResultCalculationConfigApi,
 };

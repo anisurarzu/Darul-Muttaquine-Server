@@ -9,6 +9,8 @@ const {
   getTotalSearches,
   getResultStats,
   getInstituteWiseStats,
+  insertResultCalculationConfig,
+  getResultCalculationConfigApi,
 } = require("../controllers/resultController");
 
 router.post("/add-result", verifyAuthToken, addResult);
@@ -18,5 +20,8 @@ router.get("/search-result/:scholarshipRollNumber", searchResult);
 router.get("/total-searches", getTotalSearches);
 router.get("/result-stats", getResultStats);
 router.get("/institute-wise-stats", getInstituteWiseStats);
+
+router.post("/result-calculation-config", verifyAuthToken, insertResultCalculationConfig);
+router.get("/result-calculation-config", getResultCalculationConfigApi);
 
 module.exports = router;
