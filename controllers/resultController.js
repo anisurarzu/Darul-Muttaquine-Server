@@ -227,14 +227,11 @@ const normalizeClass = (instituteClass) => {
 
 // Get result statistics: ratios and counts (overall + class-wise)
 // Present students = scholarshipV26 where isAttendanceComplete === true; result added = has correctAnswer
-// Pass = correctAnswer >= 40 (%), 70% ratio = correctAnswer >= 70
+// Pass = 40% of total marks; 70% = 70% of total. Class 3–5 total = 45, others = 100.
 const getResultStats = async (req, res) => {
   try {
     const database = getDatabase();
     const collection = database.collection("scholarshipV26");
-
-    const passThreshold = 40; // 40% to pass
-    const highMarksThreshold = 70; // 70% for "got 70% marks" ratio
 
     const totalApplications = await collection.countDocuments({});
 
@@ -262,6 +259,7 @@ const getResultStats = async (req, res) => {
 
     const passed = withResult.filter((d) => {
       const m = parseMarks(d.correctAnswer);
+      const { passThreshold } = getPassAnd70Thresholds(d.instituteClass);
       return m != null && m >= passThreshold;
     });
     const passCount = passed.length;
@@ -276,7 +274,8 @@ const getResultStats = async (req, res) => {
 
     const got70 = withResult.filter((d) => {
       const m = parseMarks(d.correctAnswer);
-      return m != null && m >= highMarksThreshold;
+      const { got70Threshold } = getPassAnd70Thresholds(d.instituteClass);
+      return m != null && m >= got70Threshold;
     });
     const got70Count = got70.length;
     const got70RatioOverall =
@@ -306,8 +305,9 @@ const getResultStats = async (req, res) => {
       if (d.correctAnswer != null) {
         row.resultAddedCount += 1;
         const m = parseMarks(d.correctAnswer);
+        const { passThreshold, got70Threshold } = getPassAnd70Thresholds(d.instituteClass);
         if (m != null && m >= passThreshold) row.passCount += 1;
-        if (m != null && m >= highMarksThreshold) row.got70Count += 1;
+        if (m != null && m >= got70Threshold) row.got70Count += 1;
       }
     }
 
@@ -316,8 +316,10 @@ const getResultStats = async (req, res) => {
       const resultAddedCount = row.resultAddedCount;
       const passCount = row.passCount;
       const got70Count = row.got70Count;
+      const totalMarks = CLASS_3_TO_5_SET.has(row.class) ? TOTAL_MARKS_CLASS_3_TO_5 : TOTAL_MARKS_OTHERS;
       return {
         class: row.class,
+        totalMarks,
         totalPresent,
         resultAddedCount,
         resultAddedRatioPercent:
@@ -432,14 +434,32 @@ const calculateSimilarity = (str1, str2) => {
 
 // Classes 3–5 (normalized: 3, Three, three → "3"; 4, Four → "4"; 5, Five → "5")
 const CLASS_3_TO_5_SET = new Set(["3", "4", "5"]);
+const TOTAL_MARKS_CLASS_3_TO_5 = 45;
+const TOTAL_MARKS_OTHERS = 100;
 
 function isClass3To5(instituteClass) {
   const c = normalizeClass(instituteClass);
   return CLASS_3_TO_5_SET.has(c);
 }
 
+// Pass = 40% of total marks; 70% = 70% of total. Class 3–5 total = 45, others = 100.
+function getTotalMarksForClass(instituteClass) {
+  return isClass3To5(instituteClass) ? TOTAL_MARKS_CLASS_3_TO_5 : TOTAL_MARKS_OTHERS;
+}
+function getPassAnd70Thresholds(instituteClass) {
+  const totalMarks = getTotalMarksForClass(instituteClass);
+  return {
+    totalMarks,
+    passThreshold: totalMarks * 0.4,
+    got70Threshold: totalMarks * 0.7,
+  };
+}
+
 // Build institute-wise ranked list from a subset of documents (same logic, reused for Class 3–5 and Others)
-function buildInstituteRankedList(all, totalApplications, passThreshold, highMarksThreshold, similarityThreshold) {
+// totalMarksForCategory: 45 for class 3–5, 100 for others. Pass = 40% of total, 70% = 70% of total.
+function buildInstituteRankedList(all, totalApplications, totalMarksForCategory, similarityThreshold) {
+  const passThreshold = totalMarksForCategory * 0.4;
+  const highMarksThreshold = totalMarksForCategory * 0.7;
   const byInstituteMap = new Map();
 
   for (const d of all) {
@@ -515,8 +535,13 @@ function buildInstituteRankedList(all, totalApplications, passThreshold, highMar
     const got70RatioPercent =
       presentCount > 0 ? Math.round((got70Count / presentCount) * 10000) / 100 : 0;
     const averageMark = resultAddedCount > 0 ? totalMarks / resultAddedCount : 0;
+    const averageMarkPercent =
+      resultAddedCount > 0
+        ? Math.round((averageMark / totalMarksForCategory) * 10000) / 100
+        : 0;
     return {
       institute: row.institute,
+      totalMarks: totalMarksForCategory,
       applicationCount,
       totalScholarshipCount: applicationCount,
       presentCount,
@@ -529,6 +554,7 @@ function buildInstituteRankedList(all, totalApplications, passThreshold, highMar
       got70Count,
       got70RatioPercent,
       averageMark,
+      averageMarkPercent,
     };
   });
 
@@ -545,7 +571,7 @@ function buildInstituteRankedList(all, totalApplications, passThreshold, highMar
     if (totalStudents > 0) {
       attendanceRate = presentCount / totalStudents;
       if (presentCount > 0) highScoreRate = got70Count / presentCount;
-      avgMarkRate = Math.min(1, Math.max(0, averageMark / 100));
+      avgMarkRate = Math.min(1, Math.max(0, averageMark / totalMarksForCategory));
     }
     const finalScore = attendanceRate * 0.3 + highScoreRate * 0.5 + avgMarkRate * 0.2;
     return {
@@ -567,7 +593,11 @@ function buildInstituteRankedList(all, totalApplications, passThreshold, highMar
   qualified.sort(sortByFairRank);
   notQualified.sort(sortByFairRank);
   const sorted = [...qualified, ...notQualified];
-  return sorted.map((row, index) => ({ rank: index + 1, ...row }));
+  return sorted.map((row, index) => ({
+    rank: index + 1,
+    totalMarks: totalMarksForCategory,
+    ...row,
+  }));
 }
 
 // Institute-wise stats: two categories — Class 3 to 5, and Others (separate datasets)
@@ -575,8 +605,6 @@ const getInstituteWiseStats = async (req, res) => {
   try {
     const database = getDatabase();
     const collection = database.collection("scholarshipV26");
-    const passThreshold = 40;
-    const highMarksThreshold = 70;
     const similarityThreshold = 0.7;
 
     const all = await collection
@@ -598,15 +626,13 @@ const getInstituteWiseStats = async (req, res) => {
     const institutesClass3To5 = buildInstituteRankedList(
       allClass3To5,
       totalApplicationsClass3To5,
-      passThreshold,
-      highMarksThreshold,
+      TOTAL_MARKS_CLASS_3_TO_5,
       similarityThreshold
     );
     const institutesOthers = buildInstituteRankedList(
       allOthers,
       totalApplicationsOthers,
-      passThreshold,
-      highMarksThreshold,
+      TOTAL_MARKS_OTHERS,
       similarityThreshold
     );
 
@@ -619,11 +645,13 @@ const getInstituteWiseStats = async (req, res) => {
       success: true,
       data: {
         class3To5: {
+          totalMarks: TOTAL_MARKS_CLASS_3_TO_5, // 45 — pass 40%, got70 = 70% of 45
           totalApplications: totalApplicationsClass3To5,
           totalNumberOfInstitutions: institutesClass3To5.length,
           institutes: institutesClass3To5,
         },
         others: {
+          totalMarks: TOTAL_MARKS_OTHERS, // 100 — pass 40%, got70 = 70% of 100
           totalApplications: totalApplicationsOthers,
           totalNumberOfInstitutions: institutesOthers.length,
           institutes: institutesOthers,
