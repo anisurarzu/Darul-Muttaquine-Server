@@ -576,15 +576,43 @@ const DEFAULT_RESULT_CALCULATION_CONFIG = {
   },
 };
 
+const PERCENT_DROPDOWN_MIN = 60;
+const PERCENT_DROPDOWN_MAX = 90;
+
+function isValidPercent(n) {
+  return typeof n === "number" && n >= PERCENT_DROPDOWN_MIN && n <= PERCENT_DROPDOWN_MAX;
+}
+
 async function getResultCalculationConfig(database) {
   const doc = await database
     .collection("resultCalculationConfig")
     .findOne({ _id: RESULT_CALCULATION_CONFIG_ID });
-  if (!doc || !doc.class3To5 || !doc.class6To12) return DEFAULT_RESULT_CALCULATION_CONFIG;
-  return {
-    class3To5: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class3To5, ...doc.class3To5 },
-    class6To12: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class6To12, ...doc.class6To12 },
+
+  const base = {
+    class3To5: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class3To5 },
+    class6To12: { ...DEFAULT_RESULT_CALCULATION_CONFIG.class6To12 },
   };
+
+  const selectedPercentClass3To5 = isValidPercent(doc?.selectedPercentClass3To5)
+    ? doc.selectedPercentClass3To5
+    : null;
+  const selectedPercentClass6To12 = isValidPercent(doc?.selectedPercentClass6To12)
+    ? doc.selectedPercentClass6To12
+    : null;
+
+  if (selectedPercentClass3To5 != null) {
+    base.class3To5.highMarksPercent = selectedPercentClass3To5;
+    base.class3To5.got75Percent = selectedPercentClass3To5;
+  }
+  if (selectedPercentClass6To12 != null) {
+    base.class6To12.highMarksPercent = selectedPercentClass6To12;
+    base.class6To12.got75Percent = selectedPercentClass6To12;
+  }
+
+  if (doc?.class3To5) base.class3To5 = { ...base.class3To5, ...doc.class3To5 };
+  if (doc?.class6To12) base.class6To12 = { ...base.class6To12, ...doc.class6To12 };
+
+  return base;
 }
 
 function isClass3To5(instituteClass) {
@@ -832,43 +860,82 @@ const getInstituteWiseStats = async (req, res) => {
   }
 };
 
-// Insert or update result calculation config (class 3–5 and 6–12: totalMarks, pass%, highMarks%, got75%)
-const insertResultCalculationConfig = async (req, res) => {
+// Dropdown options: 60% to 90% for frontend
+const getResultCalculationPercentOptions = async (req, res) => {
   try {
-    const { class3To5, class6To12 } = req.body;
+    const options = [];
+    for (let p = PERCENT_DROPDOWN_MIN; p <= PERCENT_DROPDOWN_MAX; p++) {
+      options.push({ value: p, label: `${p}%` });
+    }
+    res.status(200).json({ success: true, data: { options } });
+  } catch (error) {
+    console.error("Error getting percent options:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+// Save selected percent for Class 3 to 5 only. Result-stats class3To5 data will use this.
+const insertResultCalculationConfigClass3To5 = async (req, res) => {
+  try {
+    const { selectedPercent } = req.body;
     const database = getDatabase();
     const coll = database.collection("resultCalculationConfig");
 
-    const doc = {
-      _id: RESULT_CALCULATION_CONFIG_ID,
-      class3To5: {
-        totalMarks: typeof class3To5?.totalMarks === "number" ? class3To5.totalMarks : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.totalMarks,
-        passPercent: typeof class3To5?.passPercent === "number" ? class3To5.passPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.passPercent,
-        highMarksPercent: typeof class3To5?.highMarksPercent === "number" ? class3To5.highMarksPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.highMarksPercent,
-        got75Percent: typeof class3To5?.got75Percent === "number" ? class3To5.got75Percent : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.got75Percent,
-      },
-      class6To12: {
-        totalMarks: typeof class6To12?.totalMarks === "number" ? class6To12.totalMarks : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.totalMarks,
-        passPercent: typeof class6To12?.passPercent === "number" ? class6To12.passPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.passPercent,
-        highMarksPercent: typeof class6To12?.highMarksPercent === "number" ? class6To12.highMarksPercent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.highMarksPercent,
-        got75Percent: typeof class6To12?.got75Percent === "number" ? class6To12.got75Percent : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.got75Percent,
-      },
-      updatedAt: new Date(),
-    };
+    const percent = isValidPercent(selectedPercent)
+      ? selectedPercent
+      : DEFAULT_RESULT_CALCULATION_CONFIG.class3To5.highMarksPercent;
 
     await coll.updateOne(
       { _id: RESULT_CALCULATION_CONFIG_ID },
-      { $set: doc },
+      {
+        $set: {
+          selectedPercentClass3To5: percent,
+          updatedAt: new Date(),
+        },
+      },
       { upsert: true }
     );
 
     res.status(200).json({
       success: true,
-      message: "Result calculation config saved",
-      data: { class3To5: doc.class3To5, class6To12: doc.class6To12 },
+      message: "Class 3 to 5 percent saved. Result stats (class3To5) will use this.",
+      data: { selectedPercentClass3To5: percent },
     });
   } catch (error) {
-    console.error("Error saving result calculation config:", error);
+    console.error("Error saving result calculation config class3To5:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+// Save selected percent for Class 6 to 12 (Others) only. Result-stats class6To12 data will use this.
+const insertResultCalculationConfigClass6To12 = async (req, res) => {
+  try {
+    const { selectedPercent } = req.body;
+    const database = getDatabase();
+    const coll = database.collection("resultCalculationConfig");
+
+    const percent = isValidPercent(selectedPercent)
+      ? selectedPercent
+      : DEFAULT_RESULT_CALCULATION_CONFIG.class6To12.highMarksPercent;
+
+    await coll.updateOne(
+      { _id: RESULT_CALCULATION_CONFIG_ID },
+      {
+        $set: {
+          selectedPercentClass6To12: percent,
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Class 6 to 12 (Others) percent saved. Result stats (class6To12) will use this.",
+      data: { selectedPercentClass6To12: percent },
+    });
+  } catch (error) {
+    console.error("Error saving result calculation config class6To12:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -877,7 +944,17 @@ const getResultCalculationConfigApi = async (req, res) => {
   try {
     const database = getDatabase();
     const config = await getResultCalculationConfig(database);
-    res.status(200).json({ success: true, data: config });
+    const doc = await database
+      .collection("resultCalculationConfig")
+      .findOne({ _id: RESULT_CALCULATION_CONFIG_ID });
+    res.status(200).json({
+      success: true,
+      data: {
+        ...config,
+        selectedPercentClass3To5: isValidPercent(doc?.selectedPercentClass3To5) ? doc.selectedPercentClass3To5 : null,
+        selectedPercentClass6To12: isValidPercent(doc?.selectedPercentClass6To12) ? doc.selectedPercentClass6To12 : null,
+      },
+    });
   } catch (error) {
     console.error("Error getting result calculation config:", error);
     res.status(500).json({ message: "Server Error" });
@@ -892,6 +969,8 @@ module.exports = {
   getTotalSearches,
   getResultStats,
   getInstituteWiseStats,
-  insertResultCalculationConfig,
+  insertResultCalculationConfigClass3To5,
+  insertResultCalculationConfigClass6To12,
   getResultCalculationConfigApi,
+  getResultCalculationPercentOptions,
 };
