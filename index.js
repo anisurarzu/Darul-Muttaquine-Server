@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const swaggerJsdoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
 const { connectDB } = require("./config/database");
+const { ensureDmfVotePanelIndexes } = require("./models/dmfVotePanelModel");
 
 // Import routes
 const historyRoutes = require("./routes/historyRoutes");
@@ -23,6 +24,7 @@ const contactRoutes = require("./routes/contactRoutes");
 const courseRoutes = require("./routes/courseRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const investmentRoutes = require("./routes/investmentRoutes");
+const dmfVotePanelRoutes = require("./routes/dmfVotePanelRoutes");
 
 dotenv.config();
 
@@ -69,6 +71,7 @@ app.use("/", contactRoutes);
 app.use("/", courseRoutes);
 app.use("/", taskRoutes);
 app.use("/", investmentRoutes);
+app.use("/", dmfVotePanelRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -79,6 +82,7 @@ app.get("/", (req, res) => {
 async function startServer() {
   try {
     await connectDB();
+    await ensureDmfVotePanelIndexes();
     app.listen(port, () => {
       console.log("Server running at port", port);
           });
