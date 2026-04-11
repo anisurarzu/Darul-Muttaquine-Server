@@ -110,23 +110,18 @@ const addVoteDetail = async (req, res) => {
   }
 };
 
-/** GET all vote rows (same shape as voteDetails list) */
+/** GET সব ভোট রেকর্ড — কোনো ফিল্টার নেই */
 const getVoteDetails = async (req, res) => {
   try {
     await ensureDmfVotePanelIndexes();
     const database = getDatabase();
     const coll = database.collection(COLLECTION_NAME);
 
-    const ballotNo = normalizeBallotNo(req.query?.ballotNo);
-    const filter = ballotNo ? { ballotNo } : {};
-
-    const rows = await coll
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .toArray();
+    const rows = await coll.find({}).sort({ createdAt: -1 }).toArray();
 
     const voteDetails = rows.map((r) => ({
       ballotDetails: {
+        id: r._id,
         ballotNo: r.ballotNo,
         uniqueId: r.uniqueId,
         voterId: r.voterId,
