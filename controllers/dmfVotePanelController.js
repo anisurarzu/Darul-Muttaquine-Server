@@ -6,17 +6,42 @@ const {
 
 const toStr = (v) => (v != null ? String(v).trim() : "");
 
+/** Same ballot label always stored the same way (e.g. "1" and "01" → "01" for numeric ballots). */
+function normalizeBallotNo(v) {
+  const s = toStr(v);
+  if (!s) return "";
+  if (/^\d+$/.test(s)) return s.padStart(2, "0");
+  return s;
+}
+
+/** Voter id: trim only (must match exactly for uniqueness). */
+function normalizeVoterId(v) {
+  return toStr(v);
+}
+
+/** Values that might represent the same numeric ballot in old data ("1" vs "01"). */
+function ballotNoQueryValues(normalizedBallotNo) {
+  const b = normalizedBallotNo;
+  if (!b) return [];
+  const set = new Set([b]);
+  if (/^\d+$/.test(b)) {
+    set.add(String(parseInt(b, 10)));
+    set.add(b.padStart(2, "0"));
+  }
+  return [...set];
+}
+
 /**
  * POST body: { ballotNo, voterId, uniqueId, candidateUniqueId }
  * Stores: { ballotNo, voterId, uniqueId, candidateUniqueId, createdAt } — createdAt set by server only.
- * Rejects duplicate (ballotNo + voterId) or duplicate uniqueId.
+ * Duplicate rule: same voterId + same ballotNo only (not uniqueId).
  */
 const addVoteDetail = async (req, res) => {
   try {
     await ensureDmfVotePanelIndexes();
 
-    const ballotNo = toStr(req.body?.ballotNo);
-    const voterId = toStr(req.body?.voterId);
+    const ballotNo = normalizeBallotNo(req.body?.ballotNo);
+    const voterId = normalizeVoterId(req.body?.voterId);
     const uniqueId = toStr(req.body?.uniqueId);
     const candidateUniqueId = toStr(
       req.body?.candidateUniqueId ?? req.body?.candidateUniqueid
@@ -33,6 +58,21 @@ const addVoteDetail = async (req, res) => {
     const database = getDatabase();
     const coll = database.collection(COLLECTION_NAME);
 
+    // একই ballotNo + একই voterId আগে থাকলে আর ভোট নয় (ডাটাসেটে আগের রেকর্ড চেক)
+    const ballotKeys = ballotNoQueryValues(ballotNo);
+    const alreadyVoted = await coll.findOne({
+      voterId,
+      ballotNo: ballotKeys.length ? { $in: ballotKeys } : ballotNo,
+    });
+    if (alreadyVoted) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "এই ballotNo তে এই voterId দিয়ে আগেই ভোট আছে। আবার ভোট দেওয়া যাবে না।",
+        code: "DUPLICATE_BALLOT_VOTER",
+      });
+    }
+
     const createdAt = new Date();
 
     const doc = {
@@ -47,18 +87,11 @@ const addVoteDetail = async (req, res) => {
       await coll.insertOne(doc);
     } catch (err) {
       if (err.code === 11000) {
-        const key = err.keyPattern ? Object.keys(err.keyPattern).join("+") : "";
-        let message =
-          "Duplicate not allowed: same ballotNo+voterId, or duplicate uniqueId.";
-        if (key.includes("ballotNo") && key.includes("voterId")) {
-          message =
-            "This voter has already voted for this ballot (duplicate ballotNo + voterId).";
-        } else if (key.includes("uniqueId")) {
-          message = "This uniqueId has already been used.";
-        }
         return res.status(409).json({
           success: false,
-          message,
+          message:
+            "এই ballotNo তে এই voterId দিয়ে আগেই ভোট আছে। আবার ভোট দেওয়া যাবে না।",
+          code: "DUPLICATE_BALLOT_VOTER",
         });
       }
       throw err;
@@ -84,7 +117,7 @@ const getVoteDetails = async (req, res) => {
     const database = getDatabase();
     const coll = database.collection(COLLECTION_NAME);
 
-    const ballotNo = toStr(req.query?.ballotNo);
+    const ballotNo = normalizeBallotNo(req.query?.ballotNo);
     const filter = ballotNo ? { ballotNo } : {};
 
     const rows = await coll
